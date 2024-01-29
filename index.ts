@@ -44,7 +44,23 @@ async function main() {
     case "mint":
       switch (process.argv[3]) {
         case "token":
-          //   await mintToken();
+          if (process.argv.length < 6) {
+            console.log("Example: ");
+            console.log(
+              "bun . mint token token.json B7aGzxoUHgia1y8vRVP4EbaHkBNaasQieg"
+            );
+          }
+          const data: Buffer = fs.readFileSync(process.argv[4]);
+          const toAddress = process.argv[5];
+
+          const txs = await inscribe(
+            wallets[0].toJson(),
+            toAddress,
+            "application/json; charset=utf-8",
+            data,
+            5000
+          );
+          console.log(txs);
           break;
         default:
           console.log("Invalid command");
@@ -78,8 +94,6 @@ async function initWallets(path: string) {
 }
 
 async function saveWallets(path: string) {
-  console.log(wallets.map((x) => x.toJson().utxos));
-  console.log(JSON.stringify(wallets.map((x) => x.toJson())));
   fs.writeFileSync(path, JSON.stringify(wallets.map((x) => x.toJson())));
 }
 
@@ -153,7 +167,7 @@ async function createWalletsForPhotos(folderName: string) {
 async function inscribeWithCompileScript() {
   const content_type = "application/json; charset=utf-8";
   const data: Buffer = fs.readFileSync(wallets[0].photoPath!);
-  const toAddress = "B8fPk8EweGHgAg8RK9yu8qooYbYhu5jKNK";
+  const toAddress = "BRXknAc5gRVSh6Yo3Gs8hgwRPa3mumBwcm";
 
   const txs = await inscribe(
     wallets[0].toJson(),

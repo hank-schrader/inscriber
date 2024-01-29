@@ -4,5 +4,5 @@ dimas_collection
 deploy_token_collection
 bun.lockb
 package-lock.json
-.wallet
+.wallet.json
 token.json
