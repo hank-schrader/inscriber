@@ -4,9 +4,16 @@ import { AddressType, HDPrivateKey } from "bellhdw";
 import Wallet from "./wallet";
 import bip39 from "bip39";
 import path from "path";
-import { Psbt, networks, payments, script } from "belcoinjs-lib";
+import {
+  Psbt,
+  networks,
+  payments,
+  script,
+  crypto as belCrypto,
+} from "belcoinjs-lib";
 import ECPair from "./ecpair";
 import { OPS } from "belcoinjs-lib/src/ops";
+import inscribe from "./inscribe";
 
 const WALLET_PATH = process.env.WALLET || ".wallet.json";
 const wallets: Wallet[] = [];
@@ -177,97 +184,6 @@ async function inscribeWithCompileScript() {
     5000
   );
   console.log(txs);
-}
-
-async function inscribe(
-  wallet: IWallet,
-  address: string,
-  contentType: string,
-  data: Buffer,
-  feeRate: number
-): Promise<string> {
-  const keyPair = ECPair.fromWIF(wallet.secret);
-  let parts: Buffer[] = [];
-
-  while (data.length) {
-    let part = data.slice(0, Math.min(MAX_CHUNK_LEN, data.length));
-    data = data.slice(part.length);
-    parts.push(part);
-  }
-
-  let inscription = script.compile([
-    OPS.OP_RETURN,
-    Buffer.from("ord", "utf8"),
-    script.number.encode(parts.length),
-    Buffer.from(contentType, "utf8"),
-    ...parts.flatMap((part, n) => [
-      script.number.encode(parts.length - n - 1),
-      part,
-    ]),
-  ]);
-
-  const psbt = new Psbt({ network: networks.bitcoin });
-  (psbt as any).__CACHE.__UNSAFE_SIGN_NONSEGWIT = true;
-
-  for (const utxo of wallet.utxos) {
-    psbt.addInput({
-      hash: utxo.txid,
-      index: utxo.vout,
-      witnessUtxo: {
-        value: utxo.value,
-        script: payments.p2pkh({
-          pubkey: keyPair.publicKey,
-          network: networks.bitcoin,
-        }).output!,
-      },
-    });
-  }
-
-  // Calculate transaction fee
-  const estimatedTxSize =
-    psbt.data.globalMap.unsignedTx.toBuffer().length +
-    107 * wallet.utxos.length +
-    inscription.length +
-    34 + // Added 34 bytes for the P2PKH output
-    10;
-  const fee = Math.ceil(feeRate * estimatedTxSize);
-
-  const totalUtxoValue = wallet.utxos.reduce(
-    (acc, utxo) => acc + utxo.value,
-    0
-  );
-  const changeValue = totalUtxoValue - fee - 100000;
-
-  if (changeValue < 0) {
-    throw new Error("Not enough funds to cover the fee and the amount to send");
-  }
-
-  // Add OP_RETURN output
-  psbt.addOutput({
-    script: inscription,
-    value: 0, // OP_RETURN output should have a value of 0
-  });
-
-  // Add output to send to the specified address
-  psbt.addOutput({
-    address: address,
-    value: 100000,
-  });
-
-  // Add change output
-  if (changeValue > 0) {
-    psbt.addOutput({
-      address: wallet.address,
-      value: changeValue,
-    });
-  }
-
-  psbt.signAllInputs(keyPair);
-  psbt.finalizeAllInputs();
-
-  console.log(JSON.stringify(psbt));
-
-  return psbt.extractTransaction().toHex();
 }
 
 main().catch((e) => console.log(e));

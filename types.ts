@@ -35,6 +35,8 @@ export interface ApiUTXO {
   vout: number;
   status: Status;
   value: number;
+  scriptPubKeyHex?: string;
+  redeemScriptHex?: string;
 }
 
 export interface Status {

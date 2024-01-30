@@ -11,7 +11,7 @@
   "dependencies": {
     "@noble/hashes": "^1.3.3",
     "bel-ord-utils": "^0.1.9",
-    "belcoinjs-lib": "^0.0.4",
+    "belcoinjs-lib": "file:../belcoinjs-lib",
     "bellhdw": "^0.5.17",
     "bells-secp256k1": "^0.1.0",
     "belpair": "^0.0.8",

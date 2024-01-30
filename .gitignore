@@ -6,3 +6,6 @@ bun.lockb
 package-lock.json
 .wallet.json
 token.json
+question
+mint_token.json
+deploy_token.json
