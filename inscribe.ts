@@ -180,12 +180,12 @@ async function inscribe(
   });
 
   let inputAmount = wallet.utxos.reduce((acc, utxo) => acc + utxo.value, 0);
-  let fee = 1000000; // Placeholder fee calculation
+  let fee = 1000000;
   if (inputAmount < 100000 + fee) {
     throw new Error("not enough funds");
   }
   psbt.addOutput({
-    address: p2sh.address!,
+    address: address,
     value: 100000,
   });
   if (inputAmount - 100000 - fee > 0)
@@ -211,56 +211,59 @@ async function inscribe(
   let psbt2 = new Psbt({ network: networks.bitcoin })
     .addInput(p2shInputData)
     .addOutput({
-      address: wallet.address,
+      address: address,
       value: 100000,
     });
 
-  for (const utxo of wallet.utxos) {
-    let inputAmount = 0;
-    for (const input of psbt2.data.inputs) {
-      inputAmount += input.witnessUtxo ? input.witnessUtxo.value : 0;
-    }
-    let outputAmount = psbt2.data.outputs.reduce(
-      (acc, output) => acc + 100000,
-      0
-    );
-    // let fee = psbt2.getFee();
-    let fee = 100000 + 1000000;
-
-    if (inputAmount >= outputAmount + fee) {
-      break;
-    }
-
-    psbt2.addInput({
-      hash: utxo.txid,
-      index: utxo.vout,
-      nonWitnessUtxo: Buffer.from(hexes[wallet.utxos.indexOf(utxo)], "hex"),
-    });
-
-    psbt2.addOutput({
-      address: wallet.address,
-      value: utxo.value,
-    });
-  }
-
   psbt2.signInput(0, keyPair);
-  psbt2.signInput(1, keyPair);
-  psbt2.finalizeInput(
-    0,
-    (inputIndex, input, script, isSegwit, isP2SH, isP2WSH) => {
-      //None witness p2pkh address
-      let signature = psbt2.data.inputs[inputIndex].partialSig![0].signature;
-      let redeemScript = script;
-      let finalScriptSig = undefined;
+  psbt2.finalizeAllInputs();
 
-      finalScriptSig = belScript.compile([signature, redeemScript]);
-      return {
-        finalScriptSig,
-        finalScriptWitness: undefined,
-      };
-    }
-  );
-  psbt2.finalizeInput(1);
+  // for (const utxo of wallet.utxos) {
+  //   let inputAmount = 0;
+  //   for (const input of psbt2.data.inputs) {
+  //     inputAmount += input.witnessUtxo ? input.witnessUtxo.value : 0;
+  //   }
+  //   let outputAmount = psbt2.data.outputs.reduce(
+  //     (acc, output) => acc + 100000,
+  //     0
+  //   );
+  //   // let fee = psbt2.getFee();
+  //   let fee = 100000 + 1000000;
+
+  //   if (inputAmount >= outputAmount + fee) {
+  //     break;
+  //   }
+
+  //   psbt2.addInput({
+  //     hash: utxo.txid,
+  //     index: utxo.vout,
+  //     nonWitnessUtxo: Buffer.from(hexes[wallet.utxos.indexOf(utxo)], "hex"),
+  //   });
+
+  //   psbt2.addOutput({
+  //     address: wallet.address,
+  //     value: utxo.value,
+  //   });
+  // }
+
+  // psbt2.signInput(0, keyPair);
+  // psbt2.signInput(1, keyPair);
+  // psbt2.finalizeInput(
+  //   0,
+  //   (inputIndex, input, script, isSegwit, isP2SH, isP2WSH) => {
+  //     //None witness p2pkh address
+  //     let signature = psbt2.data.inputs[inputIndex].partialSig![0].signature;
+  //     let redeemScript = script;
+  //     let finalScriptSig = undefined;
+
+  //     finalScriptSig = belScript.compile([signature, redeemScript]);
+  //     return {
+  //       finalScriptSig,
+  //       finalScriptWitness: undefined,
+  //     };
+  //   }
+  // );
+  // psbt2.finalizeInput(1);
 
   const lastTx = psbt2.extractTransaction();
   console.log([p2shInputTx.toHex(), lastTx.toHex()]);
