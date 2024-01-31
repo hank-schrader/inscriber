@@ -1,4 +1,5 @@
 import { UnspentOutput } from "bel-ord-utils/lib/OrdTransaction";
+import { Psbt } from "belcoinjs-lib";
 
 export interface IWallet {
   address: string;
@@ -113,4 +114,12 @@ export interface Status {
   block_height: number;
   block_hash: string;
   block_time: number;
+}
+
+export interface ICalculateFeeForPsbtWithManyOutputs {
+  psbt: Psbt;
+  outputAmount: number;
+  feeRate: number;
+  address: string;
+  pair: any;
 }

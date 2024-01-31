@@ -5,7 +5,7 @@ import {
   SerializedSimpleKey,
 } from "./types";
 import { bytesToHex, hexToBytes } from "@noble/hashes/utils";
-import { ECPairInterface } from "belpair";
+import { ECPairInterface, networks } from "belpair";
 import { Psbt } from "belcoinjs-lib";
 import { sha256 } from "@noble/hashes/sha256";
 import { BaseWallet } from "bellhdw/src/hd/base";
@@ -13,6 +13,7 @@ import ECPair from "./ecpair";
 import { AddressType, Keyring } from "bellhdw";
 import { ZERO_PRIVKEY, ZERO_KEY } from "./consts";
 import { ToSignInput } from "bellhdw/src/hd/types";
+import { calculateFeeForPsbtWithManyOutputs, getHexes } from "./utils";
 
 class Wallet extends BaseWallet implements Keyring<SerializedSimpleKey> {
   privateKey: Uint8Array = ZERO_PRIVKEY;
@@ -159,6 +160,41 @@ class Wallet extends BaseWallet implements Keyring<SerializedSimpleKey> {
       fundWallet: this.fundWallet,
       photoPath: this.photoPath,
     };
+  }
+
+  async splitUtxos(feeRate: number, count: number = 2) {
+    if (!this.utxos.length) return;
+    const hexes = await getHexes(this.utxos);
+    const psbt = new Psbt({ network: networks.bitcoin });
+    psbt.setVersion(1);
+    let availabelAmount = 0;
+    for (let i = 0; i < this.utxos.length; i++) {
+      psbt.addInput({
+        hash: this.utxos[i].txid,
+        index: this.utxos[i].vout,
+        nonWitnessUtxo: Buffer.from(hexes[i], "hex"),
+      });
+      availabelAmount += this.utxos[i].value;
+    }
+
+    availabelAmount -= calculateFeeForPsbtWithManyOutputs({
+      psbt: psbt.clone(),
+      outputAmount: count,
+      feeRate,
+      address: this.getAddress(this.publicKey)!,
+      pair: this.pair!,
+    });
+
+    for (let i = 0; i < count; i++) {
+      psbt.addOutput({
+        address: this.getAddress(this.publicKey)!,
+        value: Math.floor(availabelAmount / count),
+      });
+    }
+
+    psbt.signAllInputs(this.pair!);
+    psbt.finalizeAllInputs();
+    return psbt.extractTransaction().toHex();
   }
 
   async sync() {

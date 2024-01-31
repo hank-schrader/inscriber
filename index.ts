@@ -17,7 +17,6 @@ import inscribe from "./inscribe";
 
 const WALLET_PATH = process.env.WALLET || ".wallet.json";
 const wallets: Wallet[] = [];
-const MAX_CHUNK_LEN = 240;
 // let feeRate: number | undefined = undefined;
 
 async function main() {
@@ -42,6 +41,9 @@ async function main() {
           break;
         case "sync":
           await syncWallets();
+          break;
+        case "split":
+          await splitWallets(Number(process.argv[4]) ?? 2);
           break;
         default:
           console.log("Invalid command");
@@ -169,6 +171,14 @@ async function createWalletsForPhotos(folderName: string) {
   }
   await createWallet(paths.length, paths);
   if (paths.length <= 0) await saveWallets(WALLET_PATH);
+}
+
+async function splitWallets(utxoCount: number) {
+  const txs: string[] = [];
+  for (const wallet of wallets) {
+    txs.push((await wallet.splitUtxos(5000, 2)) ?? "");
+  }
+  console.log(txs);
 }
 
 async function inscribeWithCompileScript() {
