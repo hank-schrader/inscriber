@@ -13,6 +13,17 @@ import { resolve } from "bun";
 
 const MAX_CHUNK_LEN = 240;
 const MAX_PAYLOAD_LEN = 1500;
+
+async function getHexes(utxos: ApiUTXO[]): Promise<string[]> {
+  const hexes = [];
+  for (const utxo of utxos) {
+    const hex = await (
+      await fetch(`https://api.nintondo.io/api/tx/${utxo.txid}/hex`)
+    ).text();
+    hexes.push(hex);
+  }
+  return hexes;
+}
 // async function shit_inscribe(
 //   wallet: IWallet,
 //   address: string,
@@ -103,18 +114,7 @@ const MAX_PAYLOAD_LEN = 1500;
 //   return txHex;
 // }
 
-async function getHexes(utxos: ApiUTXO[]): Promise<string[]> {
-  const hexes = [];
-  for (const utxo of utxos) {
-    const hex = await (
-      await fetch(`https://api.nintondo.io/api/tx/${utxo.txid}/hex`)
-    ).text();
-    hexes.push(hex);
-  }
-  return hexes;
-}
-
-async function inscribe(
+async function inscribe_v2(
   wallet: IWallet,
   address: string,
   contentType: string,
@@ -318,132 +318,131 @@ async function inscribe(
   // return [p2shInputTx, lastBuiltTx];
 }
 
-// function calculateFee(inscription: Buffer, wallet: IWallet, feeRate: number) {
-//   let estimatedTxSize = inscription.length + 10;
-//   wallet.utxos.forEach(() => (estimatedTxSize += 148));
-//   estimatedTxSize += 34 * 2;
-//   const fee = Math.ceil(feeRate * estimatedTxSize);
-//   const totalUtxoValue = wallet.utxos.reduce(
-//     (acc, utxo) => acc + utxo.value,
-//     0
-//   );
-//   const changeValue = totalUtxoValue - fee - 100000;
-//   if (changeValue < 0) {
-//     throw new Error("Not enough funds to cover the fee and the amount to send");
-//   }
-//   return { changeValue, estimatedTxSize };
-// }
+function calculateFee(inscription: Buffer, wallet: IWallet, feeRate: number) {
+  let estimatedTxSize = inscription.length + 10;
+  wallet.utxos.forEach(() => (estimatedTxSize += 148));
+  estimatedTxSize += 34 * 2;
+  const fee = Math.ceil(feeRate * estimatedTxSize);
+  const totalUtxoValue = wallet.utxos.reduce(
+    (acc, utxo) => acc + utxo.value,
+    0
+  );
+  const changeValue = totalUtxoValue - fee - 100000;
+  if (changeValue < 0) {
+    throw new Error("Not enough funds to cover the fee and the amount to send");
+  }
+  return { changeValue, estimatedTxSize };
+}
 
-// async function inscribe(
-//   wallet: IWallet,
-//   address: string,
-//   contentType: string,
-//   data: Buffer,
-//   feeRate: number
-// ): Promise<string[]> {
-//   const pair = ECPair.fromWIF(wallet.secret);
-//   let parts = [];
-//   const txs: string[] = [];
+async function inscribe(
+  wallet: IWallet,
+  address: string,
+  contentType: string,
+  data: Buffer,
+  feeRate: number
+): Promise<string[]> {
+  const pair = ECPair.fromWIF(wallet.secret);
+  let parts = [];
+  const txs: string[] = [];
 
-//   while (data.length) {
-//     let part = data.slice(0, Math.min(MAX_CHUNK_LEN, data.length));
-//     data = data.slice(part.length);
-//     parts.push(part);
-//   }
+  while (data.length) {
+    let part = data.slice(0, Math.min(MAX_CHUNK_LEN, data.length));
+    data = data.slice(part.length);
+    parts.push(part);
+  }
 
-//   const inscription = [
-//     Buffer.from("ord", "utf8"),
-//     script.number.encode(parts.length),
-//     Buffer.from(contentType, "utf8"),
-//     ...parts.flatMap((part, n) => [
-//       script.number.encode(parts.length - n - 1),
-//       part,
-//     ]),
-//   ];
+  const inscription = [
+    Buffer.from("ord", "utf8"),
+    belScript.number.encode(parts.length),
+    Buffer.from(contentType, "utf8"),
+    ...parts.flatMap((part, n) => [
+      belScript.number.encode(parts.length - n - 1),
+      part,
+    ]),
+  ];
 
-//   let p2shInput: any | undefined = undefined;
-//   let lastLock: any | undefined = undefined;
-//   let lastPartial: any | undefined = undefined;
+  let p2shInput: any | undefined = undefined;
+  let lastLock: any | undefined = undefined;
+  let lastPartial: any | undefined = undefined;
 
-//   while (inscription.length) {
-//     let partial: Buffer[] = [];
+  while (inscription.length) {
+    let partial: Buffer[] = [];
 
-//     if (txs.length == 0) {
-//       partial.push(inscription.shift() as Buffer);
-//     }
+    if (txs.length == 0) {
+      partial.push(inscription.shift() as Buffer);
+    }
 
-//     while (
-//       script.compile(partial).length <= MAX_PAYLOAD_LEN &&
-//       inscription.length
-//     ) {
-//       partial.push(inscription.shift()!);
-//       partial.push(inscription.shift()!);
-//     }
+    while (
+      belScript.compile(partial).length <= MAX_PAYLOAD_LEN &&
+      inscription.length
+    ) {
+      partial.push(inscription.shift()!);
+      partial.push(inscription.shift()!);
+    }
 
-//     if (script.compile(partial).length > MAX_PAYLOAD_LEN) {
-//       inscription.unshift(partial.pop()!);
-//       inscription.unshift(partial.pop()!);
-//     }
+    if (belScript.compile(partial).length > MAX_PAYLOAD_LEN) {
+      inscription.unshift(partial.pop()!);
+      inscription.unshift(partial.pop()!);
+    }
 
-//     const lock = script.compile([
-//       pair.publicKey,
-//       script.number.encode(opcodes.OP_CHECKSIGVERIFY),
-//       ...partial.map(() => script.number.encode(opcodes.OP_DROP)),
-//       script.number.encode(opcodes.OP_TRUE),
-//     ]);
+    const lock = belScript.compile([
+      pair.publicKey,
+      belScript.number.encode(opcodes.OP_CHECKSIGVERIFY),
+      ...partial.map(() => belScript.number.encode(opcodes.OP_DROP)),
+      belScript.number.encode(opcodes.OP_TRUE),
+    ]);
 
-//     const redeemScriptHash = belCrypto.hash160(lock);
+    const redeemScriptHash = belCrypto.hash160(lock);
 
-//     const p2shScript = script.compile([
-//       opcodes.OP_HASH160,
-//       redeemScriptHash,
-//       opcodes.OP_EQUAL,
-//     ]);
+    const p2shScript = belScript.compile([
+      opcodes.OP_HASH160,
+      redeemScriptHash,
+      opcodes.OP_EQUAL,
+    ]);
 
-//     const p2shOutput = {
-//       script: p2shScript,
-//       value: 100000,
-//     };
+    const p2shOutput = {
+      script: p2shScript,
+      value: 100000,
+    };
 
-//     const tx = new Psbt({ network: networks.bitcoin });
-//     (tx as any).__CACHE.__UNSAFE_SIGN_NONSEGWIT = true;
-//     tx.setVersion(2);
+    const tx = new Psbt({ network: networks.bitcoin });
+    const hexes = await getHexes(wallet.utxos);
 
-//     let { changeValue, estimatedTxSize } = calculateFee(
-//       script.compile(inscription),
-//       wallet,
-//       feeRate
-//     );
+    let { changeValue, estimatedTxSize } = calculateFee(
+      belScript.compile(inscription),
+      wallet,
+      feeRate
+    );
 
-//     if (p2shInput) tx.addInput(p2shInput);
-//     tx.addOutput(p2shOutput);
-//     tx.addOutput({
-//       address: wallet.address,
-//       value: changeValue,
-//     });
+    if (p2shInput) tx.addInput(p2shInput);
+    tx.addOutput(p2shOutput);
+    tx.addOutput({
+      address: wallet.address,
+      value: changeValue,
+    });
 
-//     for (const utxo of wallet.utxos) {
-//       tx.addInput({
-//         hash: utxo.txid,
-//         index: utxo.vout,
-//         sequence: 0xfffffffe,
-//         witnessUtxo: {
-//           script: pair.publicKey,
-//           value: utxo.value,
-//         },
-//       });
-//       estimatedTxSize += 107;
-//     }
+    for (const utxo of wallet.utxos) {
+      tx.addInput({
+        hash: utxo.txid,
+        index: utxo.vout,
+        sequence: 0xfffffffe,
+        nonWitnessUtxo: Buffer.from(
+          hexes[wallet.utxos.findIndex((f) => f.txid === utxo.txid)],
+          "hex"
+        ),
+      });
+      estimatedTxSize += 107;
+    }
 
-//     lastPartial = partial;
-//     lastLock = lock;
+    lastPartial = partial;
+    lastLock = lock;
 
-//     tx.signInput(0, pair);
-//     tx.signAllInputs(pair);
-//     tx.finalizeAllInputs();
-//     txs.push(tx.extractTransaction().toHex());
-//   }
+    tx.signInput(0, pair);
+    tx.signAllInputs(pair);
+    tx.finalizeAllInputs();
+    txs.push(tx.extractTransaction().toHex());
+  }
 
-//   return txs;
-// }
+  return txs;
+}
 export default inscribe;
