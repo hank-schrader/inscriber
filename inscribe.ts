@@ -123,14 +123,10 @@ async function inscribe(
 
     if (p2shInput !== undefined) {
       const signature = tx.data.inputs[0].partialSig![0].signature;
-      const signatureWithHashType = Buffer.concat([
-        signature,
-        Buffer.from([Transaction.SIGHASH_ALL]),
-      ]);
 
       const unlockScript = compile([
         ...lastPartial,
-        bufferToChunk(signatureWithHashType),
+        bufferToChunk(signature),
         bufferToChunk(lastLock),
       ]);
 
