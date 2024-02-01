@@ -48,6 +48,10 @@ async function inscribe(
   let lastPartial: any | undefined = undefined;
 
   while (inscription.length) {
+    if (!utxos.length)
+      throw new Error(
+        "Need 1 more utxo to create all necessary transactions for this inscription"
+      );
     let partial: Chunk[] = [];
 
     if (txs.length == 0) {
@@ -124,8 +128,8 @@ async function inscribe(
     if (change <= 0) throw new Error("Insufficient funds");
     else tx.addOutput({ address: wallet.address, value: change });
 
-    // utxos.shift();
-    // hexes.shift();
+    utxos.shift();
+    hexes.shift();
 
     tx.signAllInputs(pair);
 
@@ -159,6 +163,11 @@ async function inscribe(
     lastPartial = partial;
     lastLock = lock;
   }
+
+  if (!utxos.length)
+    throw new Error(
+      "Need 1 more utxo in wallet in order to create all transactions"
+    );
 
   const lastTx = new Psbt({ network: networks.bitcoin });
   lastTx.setVersion(1);
