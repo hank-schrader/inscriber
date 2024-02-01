@@ -73,11 +73,11 @@ async function inscribe(
       belScript.number.encode(opcodes.OP_TRUE),
     ]);
 
-    const redeemScriptHash = belCrypto.hash160(lock);
+    const lockHash = belCrypto.hash160(lock);
 
     const p2shScript = belScript.compile([
       opcodes.OP_HASH160,
-      redeemScriptHash,
+      lockHash,
       opcodes.OP_EQUAL,
     ]);
 
@@ -115,7 +115,29 @@ async function inscribe(
     hexes.shift();
 
     tx.signAllInputs(pair);
-    tx.finalizeAllInputs();
+
+    if (p2shInput !== undefined) {
+      const signature = tx.data.inputs[0].partialSig![0].signature;
+      const signatureWithHashType = Buffer.concat([
+        signature,
+        belScript.number.encode(Transaction.SIGHASH_ALL),
+      ]);
+
+      const unlockScript = belScript.compile([
+        ...lastPartial,
+        signatureWithHashType,
+        lastLock,
+      ]);
+
+      tx.finalizeInput(0, (_: any, input: any, script: any) => {
+        return {
+          finalScriptSig: unlockScript,
+          finalScriptWitness: undefined,
+        };
+      });
+      tx.finalizeInput(1);
+    } else tx.finalizeAllInputs();
+
     txs.push(tx.extractTransaction().toHex());
 
     const transaction = tx.extractTransaction();
@@ -124,7 +146,6 @@ async function inscribe(
       index: 0,
       nonWitnessUtxo: transaction.toBuffer(),
       redeemScript: lock,
-      value: p2shOutput.value,
     };
     lastPartial = partial;
     lastLock = lock;
@@ -154,11 +175,10 @@ async function inscribe(
 
   lastTx.signAllInputs(pair);
 
-  const sighashType = Transaction.SIGHASH_ALL;
   const signature = lastTx.data.inputs[0].partialSig![0].signature;
   const signatureWithHashType = Buffer.concat([
     signature,
-    belScript.number.encode(sighashType),
+    belScript.number.encode(Transaction.SIGHASH_ALL),
   ]);
 
   const unlockScript = belScript.compile([

@@ -203,6 +203,11 @@ class Wallet extends BaseWallet implements Keyring<SerializedSimpleKey> {
         method: "GET",
       })
     ).json()) as unknown as AccountBalanceResponse;
+    // const response = (await (
+    //   await fetch(`http://192.168.0.102:3001/address/${this.address}`, {
+    //     method: "GET",
+    //   })
+    // ).json()) as unknown as AccountBalanceResponse;
     if (!response) {
       this.balance = 0;
       this.utxos = [];
@@ -222,10 +227,13 @@ class Wallet extends BaseWallet implements Keyring<SerializedSimpleKey> {
           { method: "GET" }
         )
       ).json()) as unknown as ApiUTXO[];
+      // this.utxos = (await (
+      //   await fetch(`http://192.168.0.102:3001/address/${this.address}/utxo`, {
+      //     method: "GET",
+      //   })
+      // ).json()) as unknown as ApiUTXO[];
     }
   }
-
-  // calculateTransactionCost(feeRate: number) {}
 }
 
 export default Wallet;

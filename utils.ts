@@ -16,6 +16,9 @@ export async function getHexes(utxos: ApiUTXO[]): Promise<string[]> {
     const hex = await (
       await fetch(`https://api.nintondo.io/api/tx/${utxo.txid}/hex`)
     ).text();
+    // const hex = await (
+    //   await fetch(`http://192.168.0.102:3001/tx/${utxo.txid}/hex`)
+    // ).text();
     hexes.push(hex);
   }
   return hexes;
@@ -69,13 +72,10 @@ export function calculateFeeForLastTx({
   lastLock: Buffer;
 }): number {
   psbt.signAllInputs(pair);
-
-  const sighashType = Transaction.SIGHASH_ALL;
-
   const signature = psbt.data.inputs[0].partialSig![0].signature;
   const signatureWithHashType = Buffer.concat([
     signature,
-    Buffer.of(sighashType),
+    belScript.number.encode(Transaction.SIGHASH_ALL),
   ]);
 
   const unlockScript = belScript.compile([

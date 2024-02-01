@@ -4,15 +4,6 @@ import { AddressType, HDPrivateKey } from "bellhdw";
 import Wallet from "./wallet";
 import bip39 from "bip39";
 import path from "path";
-import {
-  Psbt,
-  networks,
-  payments,
-  script,
-  crypto as belCrypto,
-} from "belcoinjs-lib";
-import ECPair from "./ecpair";
-import { OPS } from "belcoinjs-lib/src/ops";
 import inscribe from "./inscribe";
 
 const WALLET_PATH = process.env.WALLET || ".wallet.json";
@@ -77,6 +68,9 @@ async function main() {
       break;
     case "inscribe":
       await inscribeWithCompileScript();
+      break;
+    case "broadcast":
+      await broadcast(process.argv[3]);
       break;
     default:
       console.log("Invalid command");
@@ -194,6 +188,35 @@ async function inscribeWithCompileScript() {
     5000
   );
   console.log(txs);
+}
+
+async function broadcast(tx: string) {
+  const body = {
+    jsonrpc: "1.0",
+    id: 0,
+    method: "sendrawtransaction",
+    params: [tx.toString()],
+  };
+
+  const options = {
+    headers: {
+      "Content-Type": "application/json",
+      Authorization:
+        "Basic " +
+        Buffer.from(
+          `${process.env.NODE_RPC_USER}:${process.env.NODE_RPC_PASS}`
+        ).toString("base64"),
+    },
+  };
+
+  fetch(process.env.NODE_RPC_URL!, {
+    method: "POST",
+    body: JSON.stringify(body),
+    headers: options.headers,
+  })
+    .then((response) => response.json())
+    .then((data) => console.log(data))
+    .catch((error) => console.error("Error:", error));
 }
 
 main().catch((e) => console.log(e));
