@@ -5,10 +5,11 @@ import Wallet from "./wallet";
 import bip39 from "bip39";
 import path from "path";
 import inscribe from "./inscribe";
+import { Transaction } from "belcoinjs-lib";
 
 const WALLET_PATH = process.env.WALLET || ".wallet.json";
 const wallets: Wallet[] = [];
-// let feeRate: number | undefined = undefined;
+let feeRate: number = 5000;
 
 async function main() {
   await initWallets(WALLET_PATH);
@@ -27,9 +28,6 @@ async function main() {
         case "import":
           await importWallet(process.argv[4]);
           break;
-        case "fee":
-          // await calculateFee();
-          break;
         case "sync":
           await syncWallets();
           break;
@@ -42,35 +40,20 @@ async function main() {
       }
       break;
     case "mint":
-      switch (process.argv[3]) {
-        case "token":
-          if (process.argv.length < 6) {
-            console.log("Example: ");
-            console.log(
-              "bun . mint token token.json B7aGzxoUHgia1y8vRVP4EbaHkBNaasQieg"
-            );
-          }
-          const data: Buffer = fs.readFileSync(process.argv[4]);
-          const toAddress = process.argv[5];
-
-          const txs = await inscribe(
-            wallets[0].toJson(),
-            toAddress,
-            "application/json; charset=utf-8",
-            data,
-            5000
-          );
-          console.log(txs);
-          break;
-        default:
-          console.log("Invalid command");
+      if (process.argv.length < 5 && process.argv.length > 3) {
+        console.log("Example: ");
+        console.log("bun . mint token.json B7aGzxoUHgia1y8vRVP4EbaHkBNaasQieg");
       }
+      await mint(process.argv[4], fs.readFileSync(process.argv[3]));
       break;
     case "inscribe":
       await inscribeWithCompileScript();
       break;
     case "broadcast":
       await broadcast(process.argv[3]);
+      break;
+    case "help":
+      console.log("");
       break;
     default:
       console.log("Invalid command");
@@ -172,7 +155,6 @@ async function splitWallets(utxoCount: number) {
   for (const wallet of wallets) {
     txs.push((await wallet.splitUtxos(5000, 2)) ?? "");
   }
-  console.log(txs);
 }
 
 async function inscribeWithCompileScript() {
@@ -217,6 +199,23 @@ async function broadcast(tx: string) {
     .then((response) => response.json())
     .then((data) => console.log(data))
     .catch((error) => console.error("Error:", error));
+}
+
+async function mint(toAddress: string, data: Buffer) {
+  const txs = await inscribe(
+    wallets[0].toJson(),
+    toAddress,
+    "application/json; charset=utf-8",
+    data,
+    feeRate
+  );
+  let fee = 0;
+  for (let tx of txs) {
+    const transaction = Transaction.fromHex(tx);
+    fee += transaction.toBuffer().length * 10000;
+  }
+  console.log(`Total transactions: ${txs.length}`);
+  console.log(`Fee costs: ${fee / 10 ** 8}`);
 }
 
 main().catch((e) => console.log(e));

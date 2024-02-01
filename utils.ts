@@ -15,19 +15,6 @@ export async function getHexes(utxos: ApiUTXO[]): Promise<string[]> {
   return hexes;
 }
 
-export function calculateFeeForPsbt(
-  psbt: Psbt,
-  pair: any,
-  finalizeMethod: (psbt: Psbt) => void,
-  feeRate: number
-): number {
-  psbt.signAllInputs(pair);
-  finalizeMethod(psbt);
-  let txSize = psbt.extractTransaction(true).toBuffer().length;
-  const fee = Math.ceil(txSize * feeRate);
-  return fee;
-}
-
 export function calculateFeeForPsbtWithManyOutputs({
   psbt,
   outputAmount,
@@ -49,19 +36,43 @@ export function calculateFeeForPsbtWithManyOutputs({
   return fee;
 }
 
+export function calculateFeeForPsbt(
+  psbt: Psbt,
+  pair: any,
+  finalizeMethod: (psbt: Psbt) => void,
+  feeRate: number,
+  address: string
+): number {
+  psbt.addOutput({
+    address: address,
+    value: 0,
+  });
+  psbt.signAllInputs(pair);
+  finalizeMethod(psbt);
+  let txSize = psbt.extractTransaction(true).toBuffer().length;
+  const fee = Math.ceil(txSize * feeRate);
+  return fee;
+}
+
 export function calculateFeeForLastTx({
   psbt,
   feeRate,
   pair,
   lastPartial,
   lastLock,
+  address,
 }: {
   psbt: Psbt;
   feeRate: number;
   pair: any;
   lastPartial: Buffer[];
   lastLock: Buffer;
+  address: string;
 }): number {
+  psbt.addOutput({
+    address: address,
+    value: 0,
+  });
   psbt.signAllInputs(pair);
   const signature = psbt.data.inputs[0].partialSig![0].signature;
   const signatureWithHashType = Buffer.concat([

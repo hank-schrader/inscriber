@@ -1,11 +1,5 @@
 import { Chunk, IWallet } from "./types";
-import {
-  Psbt,
-  networks,
-  crypto as belCrypto,
-  opcodes,
-  Transaction,
-} from "belcoinjs-lib";
+import { Psbt, networks, crypto as belCrypto, opcodes } from "belcoinjs-lib";
 import ECPair from "./ecpair";
 import {
   bufferToChunk,
@@ -103,21 +97,35 @@ async function inscribe(
       nonWitnessUtxo: Buffer.from(hexes[0], "hex"),
     });
 
-    const fee = calculateFeeForPsbt(
-      tx.clone(),
-      pair,
-      (psbt) => {
-        return psbt.finalizeAllInputs();
-      },
-      feeRate
-    );
+    let fee = 0;
+
+    if (p2shInput === undefined) {
+      fee = calculateFeeForPsbt(
+        tx.clone(),
+        pair,
+        (psbt) => {
+          return psbt.finalizeAllInputs();
+        },
+        feeRate,
+        wallet.address
+      );
+    } else {
+      fee = calculateFeeForLastTx({
+        feeRate,
+        pair,
+        psbt: tx.clone(),
+        lastPartial,
+        lastLock,
+        address: wallet.address,
+      });
+    }
 
     const change = utxos[0].value - fee - 100000;
     if (change <= 0) throw new Error("Insufficient funds");
     else tx.addOutput({ address: wallet.address, value: change });
 
-    utxos.shift();
-    hexes.shift();
+    // utxos.shift();
+    // hexes.shift();
 
     tx.signAllInputs(pair);
 
@@ -169,6 +177,7 @@ async function inscribe(
     psbt: lastTx.clone(),
     lastPartial,
     lastLock,
+    address: wallet.address,
   });
 
   const change = utxos[0].value - fee - 100000;
