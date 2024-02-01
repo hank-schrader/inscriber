@@ -32,7 +32,9 @@ async function main() {
           await syncWallets();
           break;
         case "split":
-          await splitWallets(Number(process.argv[4]) ?? 2);
+          await splitWallets(
+            Number.isNaN(Number(process.argv[4])) ? 2 : Number(process.argv[4])
+          );
           break;
         default:
           console.log("Invalid command");
@@ -153,8 +155,9 @@ async function createWalletsForPhotos(folderName: string) {
 async function splitWallets(utxoCount: number) {
   const txs: string[] = [];
   for (const wallet of wallets) {
-    txs.push((await wallet.splitUtxos(5000, 2)) ?? "");
+    txs.push((await wallet.splitUtxos(feeRate, utxoCount)) ?? "");
   }
+  console.log(txs);
 }
 
 async function inscribeWithCompileScript() {

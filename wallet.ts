@@ -176,7 +176,6 @@ class Wallet extends BaseWallet implements Keyring<SerializedSimpleKey> {
       });
       availabelAmount += this.utxos[i].value;
     }
-
     availabelAmount -= calculateFeeForPsbtWithManyOutputs({
       psbt: psbt.clone(),
       outputAmount: count,
