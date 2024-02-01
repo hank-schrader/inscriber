@@ -1,14 +1,21 @@
-import { IWallet } from "./types";
+import { Chunk, IWallet } from "./types";
 import {
   Psbt,
   networks,
-  script as belScript,
   crypto as belCrypto,
   opcodes,
   Transaction,
 } from "belcoinjs-lib";
 import ECPair from "./ecpair";
-import { calculateFeeForLastTx, calculateFeeForPsbt, getHexes } from "./utils";
+import {
+  bufferToChunk,
+  calculateFeeForLastTx,
+  calculateFeeForPsbt,
+  compile,
+  getHexes,
+  numberToChunk,
+  opcodeToChunk,
+} from "./utils";
 
 const MAX_CHUNK_LEN = 240;
 const MAX_PAYLOAD_LEN = 1500;
@@ -32,13 +39,13 @@ async function inscribe(
     parts.push(part);
   }
 
-  const inscription = [
-    Buffer.from("ord", "utf8"),
-    belScript.number.encode(parts.length),
-    Buffer.from(contentType, "utf8"),
+  const inscription: Chunk[] = [
+    bufferToChunk(Buffer.from("ord", "utf8")),
+    numberToChunk(parts.length),
+    bufferToChunk(Buffer.from(contentType, "utf8")),
     ...parts.flatMap((part, n) => [
-      belScript.number.encode(parts.length - n - 1),
-      part,
+      numberToChunk(parts.length - n - 1),
+      bufferToChunk(part),
     ]),
   ];
 
@@ -47,38 +54,35 @@ async function inscribe(
   let lastPartial: any | undefined = undefined;
 
   while (inscription.length) {
-    let partial: Buffer[] = [];
+    let partial: Chunk[] = [];
 
     if (txs.length == 0) {
-      partial.push(inscription.shift() as Buffer);
+      partial.push(inscription.shift()!);
     }
 
-    while (
-      belScript.compile(partial).length <= MAX_PAYLOAD_LEN &&
-      inscription.length
-    ) {
+    while (compile(partial).length <= MAX_PAYLOAD_LEN && inscription.length) {
       partial.push(inscription.shift()!);
       partial.push(inscription.shift()!);
     }
 
-    if (belScript.compile(partial).length > MAX_PAYLOAD_LEN) {
+    if (compile(partial).length > MAX_PAYLOAD_LEN) {
       inscription.unshift(partial.pop()!);
       inscription.unshift(partial.pop()!);
     }
 
-    const lock = belScript.compile([
-      pair.publicKey,
-      belScript.number.encode(opcodes.OP_CHECKSIGVERIFY),
-      ...partial.map(() => belScript.number.encode(opcodes.OP_DROP)),
-      belScript.number.encode(opcodes.OP_TRUE),
+    const lock = compile([
+      bufferToChunk(pair.publicKey),
+      opcodeToChunk(opcodes.OP_CHECKSIGVERIFY),
+      ...partial.map(() => opcodeToChunk(opcodes.OP_DROP)),
+      opcodeToChunk(opcodes.OP_TRUE),
     ]);
 
     const lockHash = belCrypto.hash160(lock);
 
-    const p2shScript = belScript.compile([
-      opcodes.OP_HASH160,
-      lockHash,
-      opcodes.OP_EQUAL,
+    const p2shScript = compile([
+      opcodeToChunk(opcodes.OP_HASH160),
+      bufferToChunk(lockHash),
+      opcodeToChunk(opcodes.OP_EQUAL),
     ]);
 
     const p2shOutput = {
@@ -87,6 +91,7 @@ async function inscribe(
     };
 
     const tx = new Psbt({ network: networks.bitcoin });
+    tx.setVersion(1);
 
     if (p2shInput) tx.addInput(p2shInput);
     tx.addOutput(p2shOutput);
@@ -120,13 +125,13 @@ async function inscribe(
       const signature = tx.data.inputs[0].partialSig![0].signature;
       const signatureWithHashType = Buffer.concat([
         signature,
-        belScript.number.encode(Transaction.SIGHASH_ALL),
+        Buffer.from([Transaction.SIGHASH_ALL]),
       ]);
 
-      const unlockScript = belScript.compile([
+      const unlockScript = compile([
         ...lastPartial,
-        signatureWithHashType,
-        lastLock,
+        bufferToChunk(signatureWithHashType),
+        bufferToChunk(lastLock),
       ]);
 
       tx.finalizeInput(0, (_: any, input: any, script: any) => {
@@ -152,6 +157,7 @@ async function inscribe(
   }
 
   const lastTx = new Psbt({ network: networks.bitcoin });
+  lastTx.setVersion(1);
   lastTx.addInput(p2shInput);
   lastTx.addInput({
     hash: utxos[0].txid,
@@ -176,15 +182,11 @@ async function inscribe(
   lastTx.signAllInputs(pair);
 
   const signature = lastTx.data.inputs[0].partialSig![0].signature;
-  const signatureWithHashType = Buffer.concat([
-    signature,
-    belScript.number.encode(Transaction.SIGHASH_ALL),
-  ]);
 
-  const unlockScript = belScript.compile([
+  const unlockScript = compile([
     ...lastPartial,
-    signatureWithHashType,
-    lastLock,
+    bufferToChunk(signature),
+    bufferToChunk(lastLock),
   ]);
 
   lastTx.finalizeInput(0, (_: any, input: any, script: any) => {

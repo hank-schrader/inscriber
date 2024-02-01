@@ -1,14 +1,5 @@
-import { ApiUTXO, ICalculateFeeForPsbtWithManyOutputs, IWallet } from "./types";
-import {
-  Psbt,
-  networks,
-  script as belScript,
-  crypto as belCrypto,
-  opcodes,
-  Transaction,
-  payments,
-} from "belcoinjs-lib";
-import ECPair from "./ecpair";
+import { ApiUTXO, Chunk, ICalculateFeeForPsbtWithManyOutputs } from "./types";
+import { Psbt, script as belScript, opcodes, Transaction } from "belcoinjs-lib";
 
 export async function getHexes(utxos: ApiUTXO[]): Promise<string[]> {
   const hexes = [];
@@ -94,4 +85,83 @@ export function calculateFeeForLastTx({
   let txSize = psbt.extractTransaction(true).toBuffer().length;
   const fee = Math.ceil(txSize * feeRate);
   return fee;
+}
+
+export function compile(chunks: Chunk[]) {
+  var buffers: Buffer[] = [];
+  var bufferLength = 0;
+
+  function writeUInt8(n: number) {
+    var buf = Buffer.alloc(1);
+    buf.writeUInt8(n, 0);
+    write(buf);
+  }
+
+  function writeUInt16LE(n: number) {
+    var buf = Buffer.alloc(2);
+    buf.writeUInt16LE(n, 0);
+    write(buf);
+  }
+
+  function writeUInt32LE(n: number) {
+    var buf = Buffer.alloc(4);
+    buf.writeUInt32LE(n, 0);
+    write(buf);
+  }
+
+  function write(buf: Buffer) {
+    buffers.push(buf);
+    bufferLength += buf.length;
+  }
+
+  function concat() {
+    return Buffer.concat(buffers, bufferLength);
+  }
+
+  for (var i = 0; i < chunks.length; i++) {
+    var chunk = chunks[i];
+    var opcodenum = chunk.opcodenum;
+    writeUInt8(chunk.opcodenum);
+    if (chunk.buf) {
+      if (opcodenum < opcodes.OP_PUSHDATA1) {
+        write(chunk.buf);
+      } else if (opcodenum === opcodes.OP_PUSHDATA1) {
+        writeUInt8(chunk.len!);
+        write(chunk.buf);
+      } else if (opcodenum === opcodes.OP_PUSHDATA2) {
+        writeUInt16LE(chunk.len!);
+        write(chunk.buf);
+      } else if (opcodenum === opcodes.OP_PUSHDATA4) {
+        writeUInt32LE(chunk.len!);
+        write(chunk.buf);
+      }
+    }
+  }
+
+  return concat();
+}
+
+export function bufferToChunk(b: Buffer): Chunk {
+  return {
+    buf: b.length ? b : undefined,
+    len: b.length,
+    opcodenum: b.length <= 75 ? b.length : b.length <= 255 ? 76 : 77,
+  };
+}
+
+export function numberToChunk(n: number): Chunk {
+  return {
+    buf:
+      n <= 16
+        ? undefined
+        : n < 128
+        ? Buffer.from([n])
+        : Buffer.from([n % 256, n / 256]),
+    len: n <= 16 ? 0 : n < 128 ? 1 : 2,
+    opcodenum: n == 0 ? 0 : n <= 16 ? 80 + n : n < 128 ? 1 : 2,
+  };
+}
+
+export function opcodeToChunk(op: number): Chunk {
+  return { opcodenum: op };
 }

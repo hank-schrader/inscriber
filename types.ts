@@ -123,3 +123,9 @@ export interface ICalculateFeeForPsbtWithManyOutputs {
   address: string;
   pair: any;
 }
+
+export interface Chunk {
+  buf?: Buffer;
+  len?: number;
+  opcodenum: number;
+}
