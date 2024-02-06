@@ -9,7 +9,7 @@ import { Transaction } from "belcoinjs-lib";
 
 const WALLET_PATH = process.env.WALLET || ".wallet.json";
 const wallets: Wallet[] = [];
-let feeRate: number = 5000;
+let feeRate: number = 10000;
 
 async function main() {
   await initWallets(WALLET_PATH);
@@ -215,10 +215,11 @@ async function mint(toAddress: string, data: Buffer) {
   let fee = 0;
   for (let tx of txs) {
     const transaction = Transaction.fromHex(tx);
-    fee += transaction.toBuffer().length * 10000;
+    fee += transaction.toBuffer().length * feeRate;
   }
+  console.log(txs);
   console.log(`Total transactions: ${txs.length}`);
-  console.log(`Fee costs: ${fee / 10 ** 8}`);
+  console.log(`Fee costs: ${fee / 10 ** 8} BEL`);
 }
 
 main().catch((e) => console.log(e));

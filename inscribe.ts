@@ -151,9 +151,9 @@ async function inscribe(
       tx.finalizeInput(1);
     } else tx.finalizeAllInputs();
 
-    txs.push(tx.extractTransaction().toHex());
+    txs.push(tx.extractTransaction(true).toHex());
 
-    const transaction = tx.extractTransaction();
+    const transaction = tx.extractTransaction(true);
     p2shInput = {
       hash: transaction.getId(),
       index: 0,
@@ -211,7 +211,7 @@ async function inscribe(
   });
   lastTx.finalizeInput(1);
 
-  const finalizedTx = lastTx.extractTransaction();
+  const finalizedTx = lastTx.extractTransaction(true);
   txs.push(finalizedTx.toHex());
 
   return txs;
