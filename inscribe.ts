@@ -5,6 +5,7 @@ import {
   bufferToChunk,
   calculateFeeForLastTx,
   calculateFeeForPsbt,
+  calculateTransactionNumber,
   compile,
   getHexes,
   numberToChunk,
@@ -42,6 +43,12 @@ async function inscribe(
       bufferToChunk(part),
     ]),
   ];
+
+  const transactionsAmount = calculateTransactionNumber([...inscription]);
+  if (transactionsAmount > utxos.length)
+    throw new Error(
+      `You need at least ${transactionsAmount} utxos to inscribe this data`
+    );
 
   let p2shInput: any | undefined = undefined;
   let lastLock: any | undefined = undefined;

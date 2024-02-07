@@ -193,7 +193,7 @@ class Wallet extends BaseWallet implements Keyring<SerializedSimpleKey> {
 
     psbt.signAllInputs(this.pair!);
     psbt.finalizeAllInputs();
-    return psbt.extractTransaction().toHex();
+    return psbt.extractTransaction(true).toHex();
   }
 
   async sync() {

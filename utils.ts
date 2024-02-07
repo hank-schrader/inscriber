@@ -176,3 +176,27 @@ export function numberToChunk(n: number): Chunk {
 export function opcodeToChunk(op: number): Chunk {
   return { opcodenum: op };
 }
+
+export function calculateTransactionNumber(inscription: Chunk[]): number {
+  const txs = [];
+  while (inscription.length) {
+    let partial: Chunk[] = [];
+
+    if (txs.length == 0) {
+      partial.push(inscription.shift()!);
+    }
+
+    while (compile(partial).length <= 1500 && inscription.length) {
+      partial.push(inscription.shift()!);
+      partial.push(inscription.shift()!);
+    }
+
+    if (compile(partial).length > 1500) {
+      inscription.unshift(partial.pop()!);
+      inscription.unshift(partial.pop()!);
+    }
+
+    txs.push(partial);
+  }
+  return txs.length + 1;
+}
