@@ -1,4 +1,4 @@
-import { Chunk, IWallet } from "./types";
+import { ApiUTXO, Chunk, IWallet } from "./types";
 import { Psbt, networks, crypto as belCrypto, opcodes } from "belcoinjs-lib";
 import ECPair from "./ecpair";
 import {
@@ -27,6 +27,9 @@ async function inscribe(
   const txs: string[] = [];
   const utxos = wallet.utxos;
   const hexes = await getHexes(wallet.utxos);
+  for (const i of utxos) {
+    i.rawHex = hexes.shift()!;
+  }
 
   while (data.length) {
     let part = data.slice(0, Math.min(MAX_CHUNK_LEN, data.length));
@@ -44,21 +47,11 @@ async function inscribe(
     ]),
   ];
 
-  const transactionsAmount = calculateTransactionNumber([...inscription]);
-  if (transactionsAmount > utxos.length)
-    throw new Error(
-      `You need at least ${transactionsAmount} utxos to inscribe this data`
-    );
-
   let p2shInput: any | undefined = undefined;
   let lastLock: any | undefined = undefined;
   let lastPartial: any | undefined = undefined;
 
   while (inscription.length) {
-    if (!utxos.length)
-      throw new Error(
-        "Need 1 more utxo to create all necessary transactions for this inscription"
-      );
     let partial: Chunk[] = [];
 
     if (txs.length == 0) {
@@ -101,42 +94,52 @@ async function inscribe(
     if (p2shInput) tx.addInput(p2shInput);
     tx.addOutput(p2shOutput);
 
-    tx.addInput({
-      hash: utxos[0].txid,
-      index: utxos[0].vout,
-      sequence: 0xfffffffe,
-      nonWitnessUtxo: Buffer.from(hexes[0], "hex"),
-    });
-
-    let fee = 0;
-
-    if (p2shInput === undefined) {
-      fee = calculateFeeForPsbt(
-        tx.clone(),
-        pair,
-        (psbt) => {
-          return psbt.finalizeAllInputs();
-        },
-        feeRate,
-        wallet.address
-      );
-    } else {
-      fee = calculateFeeForLastTx({
-        feeRate,
-        pair,
-        psbt: tx.clone(),
-        lastPartial,
-        lastLock,
-        address: wallet.address,
+    let change = 0;
+    const usedUtxos: ApiUTXO[] = [];
+    const availableUtxos = utxos;
+    while (change <= 0 && availableUtxos.length > 0) {
+      tx.addInput({
+        hash: availableUtxos[0].txid,
+        index: availableUtxos[0].vout,
+        sequence: 0xfffffffe,
+        nonWitnessUtxo: Buffer.from(availableUtxos[0].rawHex!, "hex"),
       });
+      availableUtxos.shift();
+      usedUtxos.push(availableUtxos[0]);
+
+      let fee = 0;
+
+      if (p2shInput === undefined) {
+        fee = calculateFeeForPsbt(
+          tx.clone(),
+          pair,
+          (psbt) => {
+            return psbt.finalizeAllInputs();
+          },
+          feeRate,
+          wallet.address
+        );
+      } else {
+        fee = calculateFeeForLastTx({
+          feeRate,
+          pair,
+          psbt: tx.clone(),
+          lastPartial,
+          lastLock,
+          address: wallet.address,
+        });
+      }
+
+      change =
+        usedUtxos.reduce((accumulator, utxo) => accumulator + utxo.value, 0) -
+        fee -
+        100000;
+      if (change <= 0 && availableUtxos.length <= 1)
+        throw new Error("Insufficient funds");
+      else tx.addOutput({ address: wallet.address, value: change });
     }
 
-    const change = utxos[0].value - fee - 100000;
-    if (change <= 0) throw new Error("Insufficient funds");
-    else tx.addOutput({ address: wallet.address, value: change });
-
-    utxos.shift();
-    hexes.shift();
+    utxos.splice(0, usedUtxos.length);
 
     tx.signAllInputs(pair);
 
@@ -171,34 +174,46 @@ async function inscribe(
     lastLock = lock;
   }
 
-  if (!utxos.length)
-    throw new Error(
-      "Need 1 more utxo in wallet in order to create all transactions"
-    );
-
   const lastTx = new Psbt({ network: networks.bitcoin });
   lastTx.setVersion(1);
   lastTx.addInput(p2shInput);
-  lastTx.addInput({
-    hash: utxos[0].txid,
-    index: utxos[0].vout,
-    sequence: 0xfffffffe,
-    nonWitnessUtxo: Buffer.from(hexes[0], "hex"),
-  });
   lastTx.addOutput({ address: address, value: 100000 });
-
-  const fee = calculateFeeForLastTx({
-    feeRate,
-    pair,
-    psbt: lastTx.clone(),
-    lastPartial,
-    lastLock,
-    address: wallet.address,
+  lastTx.addOutput({
+    address: "BDJqmvvM2Ceh3JcguE3xScBUAGE88nJjcj",
+    value: 1000000,
   });
 
-  const change = utxos[0].value - fee - 100000;
-  if (change <= 0) throw new Error("Insufficient funds");
-  else lastTx.addOutput({ address: wallet.address, value: change });
+  let change = 0;
+  const usedUtxos: ApiUTXO[] = [];
+  const availableUtxos = utxos;
+  while (change <= 0 && availableUtxos.length > 0) {
+    lastTx.addInput({
+      hash: availableUtxos[0].txid,
+      index: availableUtxos[0].vout,
+      sequence: 0xfffffffe,
+      nonWitnessUtxo: Buffer.from(availableUtxos[0].rawHex!, "hex"),
+    });
+    availableUtxos.shift();
+    usedUtxos.push(availableUtxos[0]);
+
+    const fee = calculateFeeForLastTx({
+      feeRate,
+      pair,
+      psbt: lastTx.clone(),
+      lastPartial,
+      lastLock,
+      address: wallet.address,
+    });
+
+    change =
+      usedUtxos.reduce((accumulator, utxo) => accumulator + utxo.value, 0) -
+      fee -
+      100000 -
+      1000000;
+    if (change <= 0 && availableUtxos.length <= 1)
+      throw new Error("Insufficient funds");
+    else lastTx.addOutput({ address: wallet.address, value: change });
+  }
 
   lastTx.signAllInputs(pair);
 
