@@ -1,15 +1,11 @@
+import { TEST_API } from "./consts";
 import { ApiUTXO, Chunk, ICalculateFeeForPsbtWithManyOutputs } from "./types";
 import { Psbt, script as belScript, opcodes, Transaction } from "belcoinjs-lib";
 
 export async function getHexes(utxos: ApiUTXO[]): Promise<string[]> {
   const hexes = [];
   for (const utxo of utxos) {
-    const hex = await (
-      await fetch(`https://api.nintondo.io/api/tx/${utxo.txid}/hex`)
-    ).text();
-    // const hex = await (
-    //   await fetch(`http://192.168.0.102:3001/tx/${utxo.txid}/hex`)
-    // ).text();
+    const hex = await (await fetch(`${TEST_API}/tx/${utxo.txid}/hex`)).text();
     hexes.push(hex);
   }
   return hexes;

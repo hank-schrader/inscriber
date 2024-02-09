@@ -11,7 +11,7 @@ import { sha256 } from "@noble/hashes/sha256";
 import { BaseWallet } from "bellhdw/src/hd/base";
 import ECPair from "./ecpair";
 import { AddressType, Keyring } from "bellhdw";
-import { ZERO_PRIVKEY, ZERO_KEY } from "./consts";
+import { ZERO_PRIVKEY, ZERO_KEY, TEST_API, MAIN_API } from "./consts";
 import { ToSignInput } from "bellhdw/src/hd/types";
 import { calculateFeeForPsbtWithManyOutputs, getHexes } from "./utils";
 
@@ -198,15 +198,10 @@ class Wallet extends BaseWallet implements Keyring<SerializedSimpleKey> {
 
   async sync() {
     const response = (await (
-      await fetch(`https://api.nintondo.io/api/address/${this.address}`, {
+      await fetch(`${TEST_API}/address/${this.address}`, {
         method: "GET",
       })
     ).json()) as unknown as AccountBalanceResponse;
-    // const response = (await (
-    //   await fetch(`http://192.168.0.102:3001/address/${this.address}`, {
-    //     method: "GET",
-    //   })
-    // ).json()) as unknown as AccountBalanceResponse;
     if (!response) {
       this.balance = 0;
       this.utxos = [];
@@ -221,16 +216,10 @@ class Wallet extends BaseWallet implements Keyring<SerializedSimpleKey> {
 
     if (this.balance) {
       this.utxos = (await (
-        await fetch(
-          `https://api.nintondo.io/api/address/${this.address}/utxo`,
-          { method: "GET" }
-        )
+        await fetch(`${TEST_API}/address/${this.address}/utxo`, {
+          method: "GET",
+        })
       ).json()) as unknown as ApiUTXO[];
-      // this.utxos = (await (
-      //   await fetch(`http://192.168.0.102:3001/address/${this.address}/utxo`, {
-      //     method: "GET",
-      //   })
-      // ).json()) as unknown as ApiUTXO[];
     }
   }
 }

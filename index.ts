@@ -6,10 +6,11 @@ import bip39 from "bip39";
 import path from "path";
 import inscribe from "./inscribe";
 import { Transaction } from "belcoinjs-lib";
+import { TEST_API } from "./consts";
 
 const WALLET_PATH = process.env.WALLET || ".wallet.json";
 const wallets: Wallet[] = [];
-let feeRate: number = 10000;
+let feeRate: number = 4000;
 
 async function main() {
   await initWallets(WALLET_PATH);
@@ -217,9 +218,22 @@ async function mint(toAddress: string, data: Buffer) {
     const transaction = Transaction.fromHex(tx);
     fee += transaction.toBuffer().length * feeRate;
   }
-  console.log(txs);
+  // console.log(txs);
   console.log(`Total transactions: ${txs.length}`);
   console.log(`Fee costs: ${fee / 10 ** 8} BEL`);
+  await broadcastToTestnet(txs);
+}
+
+async function broadcastToTestnet(txs: string[]) {
+  for (const tx of txs) {
+    const txid = await (
+      await fetch(`${TEST_API}/tx`, {
+        method: "POST",
+        body: tx,
+      })
+    ).text();
+    console.log(`✅ Inscription: ${txid}`);
+  }
 }
 
 main().catch((e) => console.log(e));
