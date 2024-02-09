@@ -34,7 +34,7 @@ export interface MempoolStats {
 export interface ApiUTXO {
   txid: string;
   vout: number;
-  status: Status;
+  status?: Status;
   value: number;
   scriptPubKeyHex?: string;
   redeemScriptHex?: string;

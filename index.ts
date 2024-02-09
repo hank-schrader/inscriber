@@ -5,8 +5,10 @@ import Wallet from "./wallet";
 import bip39 from "bip39";
 import path from "path";
 import inscribe from "./inscribe";
-import { Transaction } from "belcoinjs-lib";
+import { Psbt, Transaction, networks } from "belcoinjs-lib";
 import { TEST_API } from "./consts";
+import ECPair from "./ecpair";
+import { calculateFeeForPsbt } from "./utils";
 
 const WALLET_PATH = process.env.WALLET || ".wallet.json";
 const wallets: Wallet[] = [];
@@ -54,6 +56,14 @@ async function main() {
       break;
     case "broadcast":
       await broadcast(process.argv[3]);
+      break;
+    case "send":
+      await send(
+        process.argv[3],
+        Number(process.argv[4]),
+        Number(process.argv[5]),
+        process.argv[6]
+      );
       break;
     case "help":
       console.log("");
@@ -234,6 +244,72 @@ async function broadcastToTestnet(txs: string[]) {
     ).text();
     console.log(`✅ Inscription: ${txid}`);
   }
+}
+
+async function send(
+  toAddress: string,
+  amount: number,
+  walletIndex: number = 0,
+  utxoTxid?: string
+) {
+  amount = 200 * 10 ** 8;
+  utxoTxid = "9e9126a66aaa700aebe9bc37ba04e09685cc623d62345a955b4a425589bed144";
+  const wallet = wallets[walletIndex];
+  const tx = new Psbt({ network: networks.bitcoin });
+  if (utxoTxid) {
+    const rawHex = await (await fetch(`${TEST_API}/tx/${utxoTxid}/hex`)).text();
+    const utxo = wallet.utxos.find((x) => x.txid === utxoTxid);
+    tx.addInput({
+      hash: utxoTxid,
+      index: utxo?.vout!,
+      sequence: 0xfffffffe,
+      nonWitnessUtxo: Buffer.from(rawHex, "hex"),
+    });
+  } else {
+    // for (const utxo of wallet.utxos) {
+    //   const rawHex = await (
+    //     await fetch(`${TEST_API}/tx/${utxo.txid}/hex`)
+    //   ).text();
+    //   tx.addInput({
+    //     hash: utxo.txid,
+    //     index: utxo.vout,
+    //     sequence: 0xfffffffe,
+    //     nonWitnessUtxo: Buffer.from(rawHex, "hex"),
+    //   });
+    // }
+  }
+
+  tx.addOutput({ address: toAddress, value: amount });
+  const fee = calculateFeeForPsbt(
+    tx.clone(),
+    ECPair.fromWIF(wallet.toJson().secret),
+    (psbt: Psbt) => {
+      psbt.finalizeAllInputs();
+    },
+    feeRate,
+    wallet.address
+  );
+
+  // const change =
+  //   tx.txInputs.reduce(
+  //     (acc, input) =>
+  //       acc +
+  //       wallet.utxos.find((f) => f.txid === input.hash.toString("hex"))?.value!,
+  //     0
+  //   ) -
+  //   amount -
+  //   fee;
+
+  const change =
+    wallet.utxos.find((x) => x.txid === utxoTxid)?.value! - amount - fee;
+
+  console.log(`Fee: ${fee / 10 ** 8}`);
+  console.log(`Change: ${change / 10 ** 8}`);
+  tx.addOutput({ address: wallet.address, value: change });
+  tx.signAllInputs(ECPair.fromWIF(wallet.toJson().secret));
+  tx.finalizeAllInputs();
+  const txHex = tx.extractTransaction(true).toHex();
+  await broadcastToTestnet([txHex]);
 }
 
 main().catch((e) => console.log(e));

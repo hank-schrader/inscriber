@@ -104,8 +104,8 @@ async function inscribe(
         sequence: 0xfffffffe,
         nonWitnessUtxo: Buffer.from(availableUtxos[0].rawHex!, "hex"),
       });
-      availableUtxos.shift();
       usedUtxos.push(availableUtxos[0]);
+      availableUtxos.shift();
 
       let fee = 0;
 
@@ -131,12 +131,11 @@ async function inscribe(
       }
 
       change =
-        usedUtxos.reduce((accumulator, utxo) => accumulator + utxo.value, 0) -
-        fee -
-        100000;
-      if (change <= 0 && availableUtxos.length <= 1)
+        usedUtxos.reduce((acc, utxo) => acc + utxo.value, 0) - fee - 100000;
+      if (change <= 0 && availableUtxos.length < 1)
         throw new Error("Insufficient funds");
-      else tx.addOutput({ address: wallet.address, value: change });
+      else if (change > 0)
+        tx.addOutput({ address: wallet.address, value: change });
     }
 
     utxos.splice(0, usedUtxos.length);
@@ -164,6 +163,12 @@ async function inscribe(
     txs.push(tx.extractTransaction(true).toHex());
 
     const transaction = tx.extractTransaction(true);
+    utxos.unshift({
+      txid: transaction.getId(),
+      vout: 1,
+      value: change,
+      rawHex: transaction.toHex(),
+    });
     p2shInput = {
       hash: transaction.getId(),
       index: 0,
@@ -193,8 +198,8 @@ async function inscribe(
       sequence: 0xfffffffe,
       nonWitnessUtxo: Buffer.from(availableUtxos[0].rawHex!, "hex"),
     });
-    availableUtxos.shift();
     usedUtxos.push(availableUtxos[0]);
+    availableUtxos.shift();
 
     const fee = calculateFeeForLastTx({
       feeRate,
@@ -210,9 +215,10 @@ async function inscribe(
       fee -
       100000 -
       1000000;
-    if (change <= 0 && availableUtxos.length <= 1)
+    if (change <= 0 && availableUtxos.length < 1)
       throw new Error("Insufficient funds");
-    else lastTx.addOutput({ address: wallet.address, value: change });
+    else if (change > 0)
+      lastTx.addOutput({ address: wallet.address, value: change });
   }
 
   lastTx.signAllInputs(pair);
