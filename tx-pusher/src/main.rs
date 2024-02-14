@@ -29,9 +29,8 @@ async fn transaction_is_confirmed(tx_id: &str) -> anyhow::Result<bool>{
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    // let transaction: Transactin = response
-    let file = "inscriptions.json";
+    let file = "./inscriptions.json";
     let inscriptions: Vec<Inscription> = serde_json::from_slice(&tokio::fs::read(file).await.wrap()?).wrap()?;
-    println!("{:?}", inscriptions);
+    inscriptions.iter().map()
     Ok(())
 }

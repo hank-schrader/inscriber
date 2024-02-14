@@ -12,7 +12,7 @@ import { calculateFeeForPsbt } from "./utils";
 
 const WALLET_PATH = process.env.WALLET || ".wallet.json";
 const CONTENT_TYPE = "image/jpg";
-const PUSH_TX_PATH = "./tx-pusher/src/inscriptions.json";
+const PUSH_TX_PATH = "./tx-pusher/inscriptions.json";
 const wallets: Wallet[] = [];
 let feeRate: number = 4000;
 
