@@ -67,3 +67,17 @@ pub struct Status {
     #[serde(rename = "block_time")]
     pub block_time: i64,
 }
+
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Inscription {
+    pub inscription_number: i64,
+    pub txs: Vec<Tx>,
+}
+
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Tx {
+    pub pushed: bool,
+    pub tx_hex: String,
+}
