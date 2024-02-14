@@ -1,5 +1,5 @@
 import fs from "fs";
-import { IWallet } from "./types";
+import { IWallet, Inscription } from "./types";
 import { AddressType, HDPrivateKey } from "bellhdw";
 import Wallet from "./wallet";
 import bip39 from "bip39";
@@ -11,6 +11,8 @@ import ECPair from "./ecpair";
 import { calculateFeeForPsbt } from "./utils";
 
 const WALLET_PATH = process.env.WALLET || ".wallet.json";
+const CONTENT_TYPE = "image/jpg";
+const PUSH_TX_PATH = "./tx-pusher/src/inscriptions.json";
 const wallets: Wallet[] = [];
 let feeRate: number = 4000;
 
@@ -219,7 +221,7 @@ async function mint(toAddress: string, data: Buffer) {
   const txs = await inscribe(
     wallets[0].toJson(),
     toAddress,
-    "application/json; charset=utf-8",
+    CONTENT_TYPE,
     data,
     feeRate
   );
@@ -231,7 +233,20 @@ async function mint(toAddress: string, data: Buffer) {
   // console.log(txs);
   console.log(`Total transactions: ${txs.length}`);
   console.log(`Fee costs: ${fee / 10 ** 8} BEL`);
-  await broadcastToTestnet(txs);
+  if (txs.length > 10) {
+    const inscriptions: Inscription[] = await getToPushTxs(PUSH_TX_PATH);
+    inscriptions.push({
+      inscriptionNumber:
+        (inscriptions[inscriptions.length - 1]?.inscriptionNumber ?? 0) + 1,
+      txs: txs.map((f) => ({ pushed: false, txHex: f })),
+    });
+    fs.writeFileSync(PUSH_TX_PATH, JSON.stringify(inscriptions));
+    console.log(
+      "🫶🏻🫶🏻🫶🏻 There were to many transactions, so you gonna have to use rust code, GL!"
+    );
+  } else {
+    await broadcastToTestnet(txs);
+  }
 }
 
 async function broadcastToTestnet(txs: string[]) {
@@ -242,7 +257,11 @@ async function broadcastToTestnet(txs: string[]) {
         body: tx,
       })
     ).text();
-    console.log(`✅ Inscription: ${txid}`);
+    if (txid.length === 64) console.log(`✅ Inscription: ${txid}`);
+    else {
+      console.log(`❌ ${txid}`);
+      console.log(`Failed to push hex:\n${tx}\n`);
+    }
   }
 }
 
@@ -252,8 +271,8 @@ async function send(
   walletIndex: number = 0,
   utxoTxid?: string
 ) {
-  amount = 200 * 10 ** 8;
-  utxoTxid = "9e9126a66aaa700aebe9bc37ba04e09685cc623d62345a955b4a425589bed144";
+  amount = 5000 * 10 ** 8;
+  utxoTxid = "36f4c830cf53da4791538118eac5e5eaf6c58745458bb6a93ca63981228fdd1f";
   const wallet = wallets[walletIndex];
   const tx = new Psbt({ network: networks.bitcoin });
   if (utxoTxid) {
@@ -279,7 +298,10 @@ async function send(
     // }
   }
 
-  tx.addOutput({ address: toAddress, value: amount });
+  tx.addOutput({
+    address: "B8fPk8EweGHgAg8RK9yu8qooYbYhu5jKNK",
+    value: amount,
+  });
   const fee = calculateFeeForPsbt(
     tx.clone(),
     ECPair.fromWIF(wallet.toJson().secret),
@@ -310,6 +332,14 @@ async function send(
   tx.finalizeAllInputs();
   const txHex = tx.extractTransaction(true).toHex();
   await broadcastToTestnet([txHex]);
+}
+
+async function getToPushTxs(path: string): Promise<Inscription[]> {
+  if (fs.existsSync(path)) {
+    const fileContent = fs.readFileSync(path).toString();
+    if (fileContent.length === 0) return [];
+    return JSON.parse(fileContent) as unknown as Inscription[];
+  } else return [];
 }
 
 main().catch((e) => console.log(e));

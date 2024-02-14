@@ -130,3 +130,8 @@ export interface Chunk {
   len?: number;
   opcodenum: number;
 }
+
+export interface Inscription {
+  inscriptionNumber: number;
+  txs: { txHex: string; pushed: boolean }[];
+}
