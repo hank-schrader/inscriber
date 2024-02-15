@@ -101,6 +101,11 @@ async fn main() -> anyhow::Result<()> {
             if let Some(inscription) = updated_inscription {
                 if inscription.txs.iter().filter(|tx| !tx.pushed).count() > 0 {
                     finished = false;
+                    println!(
+                        "Pushed {}/{}",
+                        inscription.txs.iter().filter(|tx| !tx.pushed).count(),
+                        inscription.txs.len()
+                    );
                     updated_inscriptions.push(inscription);
                 } else {
                     println!(
