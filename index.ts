@@ -11,7 +11,7 @@ import ECPair from "./ecpair";
 import { calculateFeeForPsbt } from "./utils";
 
 const WALLET_PATH = process.env.WALLET || ".wallet.json";
-const CONTENT_TYPE = "image/jpg";
+const CONTENT_TYPE = "image/gif";
 const PUSH_TX_PATH = "./tx-pusher/inscriptions.json";
 const wallets: Wallet[] = [];
 let feeRate: number = 4000;
@@ -242,7 +242,7 @@ async function mint(toAddress: string, data: Buffer) {
     });
     fs.writeFileSync(PUSH_TX_PATH, JSON.stringify(inscriptions));
     console.log(
-      "🫶🏻🫶🏻🫶🏻 There were to many transactions, so you gonna have to use rust code, GL!"
+      "🫶🫶🫶 There were to many transactions, so you gonna have to use rust code, GL!"
     );
   } else {
     await broadcastToTestnet(txs);
