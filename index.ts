@@ -11,7 +11,7 @@ import ECPair from "./ecpair";
 import { calculateFeeForPsbt } from "./utils";
 
 const WALLET_PATH = process.env.WALLET || ".wallet.json";
-const CONTENT_TYPE = "image/gif";
+const CONTENT_TYPE = "application/json; charset=utf-8";
 const PUSH_TX_PATH = "./tx-pusher/inscriptions.json";
 const wallets: Wallet[] = [];
 let feeRate: number = 4000;
@@ -174,14 +174,13 @@ async function splitWallets(utxoCount: number) {
 }
 
 async function inscribeWithCompileScript() {
-  const content_type = "application/json; charset=utf-8";
   const data: Buffer = fs.readFileSync(wallets[0].photoPath!);
   const toAddress = "BRXknAc5gRVSh6Yo3Gs8hgwRPa3mumBwcm";
 
   const txs = await inscribe(
     wallets[0].toJson(),
     toAddress,
-    content_type,
+    CONTENT_TYPE,
     data,
     5000
   );

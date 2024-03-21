@@ -94,6 +94,23 @@ class Wallet extends BaseWallet implements Keyring<SerializedSimpleKey> {
     return this;
   }
 
+  signAllInputsInPsbt(
+    psbt: Psbt,
+    accountAddress: string
+  ): { signatures: (string | undefined)[] } {
+    return { signatures: [""] };
+  }
+
+  signInputsWithoutFinalizing(
+    psbt: Psbt,
+    inputs: ToSignInput[]
+  ): {
+    inputIndex: number;
+    partialSig: { pubkey: Buffer; signature: Buffer }[];
+  }[] {
+    return [];
+  }
+
   static deserialize(state: SerializedSimpleKey) {
     let pair: ECPairInterface | undefined;
 
@@ -198,21 +215,17 @@ class Wallet extends BaseWallet implements Keyring<SerializedSimpleKey> {
 
   async sync() {
     const response = (await (
-      await fetch(`${TEST_API}/address/${this.address}`, {
+      await fetch(`${TEST_API}/address/${this.address}/utxo`, {
         method: "GET",
       })
-    ).json()) as unknown as AccountBalanceResponse;
+    ).json()) as unknown as ApiUTXO[];
     if (!response) {
       this.balance = 0;
       this.utxos = [];
       return;
     }
 
-    this.balance =
-      response.chain_stats.funded_txo_sum -
-      response.chain_stats.spent_txo_sum +
-      response.mempool_stats.funded_txo_sum -
-      response.mempool_stats.spent_txo_sum;
+    this.balance = response.reduce((acc, v) => (acc += v.value), 0);
 
     if (this.balance) {
       this.utxos = (await (

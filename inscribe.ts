@@ -11,6 +11,7 @@ import {
   numberToChunk,
   opcodeToChunk,
 } from "./utils";
+import { UTXO_VALUE } from "./consts";
 
 const MAX_CHUNK_LEN = 240;
 const MAX_PAYLOAD_LEN = 1500;
@@ -85,7 +86,7 @@ async function inscribe(
 
     const p2shOutput = {
       script: p2shScript,
-      value: 100000,
+      value: UTXO_VALUE,
     };
 
     const tx = new Psbt({ network: networks.bitcoin });
@@ -131,7 +132,7 @@ async function inscribe(
       }
 
       change =
-        usedUtxos.reduce((acc, utxo) => acc + utxo.value, 0) - fee - 100000;
+        usedUtxos.reduce((acc, utxo) => acc + utxo.value, 0) - fee - UTXO_VALUE;
       if (change <= 0 && availableUtxos.length < 1)
         throw new Error("Insufficient funds");
       else if (change > 0)
@@ -182,7 +183,7 @@ async function inscribe(
   const lastTx = new Psbt({ network: networks.bitcoin });
   lastTx.setVersion(1);
   lastTx.addInput(p2shInput);
-  lastTx.addOutput({ address: address, value: 100000 });
+  lastTx.addOutput({ address: address, value: UTXO_VALUE });
   lastTx.addOutput({
     address: "BDJqmvvM2Ceh3JcguE3xScBUAGE88nJjcj",
     value: 1000000,
@@ -213,7 +214,7 @@ async function inscribe(
     change =
       usedUtxos.reduce((accumulator, utxo) => accumulator + utxo.value, 0) -
       fee -
-      100000 -
+      UTXO_VALUE -
       1000000;
     if (change <= 0 && availableUtxos.length < 1)
       throw new Error("Insufficient funds");

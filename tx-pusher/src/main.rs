@@ -102,7 +102,7 @@ async fn main() -> anyhow::Result<()> {
                 if inscription.txs.iter().filter(|tx| !tx.pushed).count() > 0 {
                     finished = false;
                     println!(
-                        "Pushed {}/{}",
+                        "{}/{} transactions to push",
                         inscription.txs.iter().filter(|tx| !tx.pushed).count(),
                         inscription.txs.len()
                     );
