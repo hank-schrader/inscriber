@@ -4,7 +4,7 @@ export const MIN_ENTROPY: number = 128;
 export const MAX_ENTROPY: number = 512;
 export const ZERO_KEY = Buffer.allocUnsafe(PUBKEY_SIZE);
 export const ZERO_PRIVKEY = Buffer.allocUnsafe(PRIVKEY_SIZE);
-export const TEST_API = "http://0.0.0.0:3001";
+export const ELECTRS_API = "http://0.0.0.0:3001";
 export const MAIN_API = "https://api.nintondo.io/api";
 
-export const UTXO_VALUE = 2000000;
+export const UTXO_VALUE = 150000;

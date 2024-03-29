@@ -1,11 +1,13 @@
-import { TEST_API } from "./consts";
+import { ELECTRS_API } from "./consts";
 import { ApiUTXO, Chunk, ICalculateFeeForPsbtWithManyOutputs } from "./types";
 import { Psbt, script as belScript, opcodes, Transaction } from "belcoinjs-lib";
 
 export async function getHexes(utxos: ApiUTXO[]): Promise<string[]> {
   const hexes = [];
   for (const utxo of utxos) {
-    const hex = await (await fetch(`${TEST_API}/tx/${utxo.txid}/hex`)).text();
+    const hex = await (
+      await fetch(`${ELECTRS_API}/tx/${utxo.txid}/hex`)
+    ).text();
     hexes.push(hex);
   }
   return hexes;
@@ -195,4 +197,24 @@ export function calculateTransactionNumber(inscription: Chunk[]): number {
     txs.push(partial);
   }
   return txs.length + 1;
+}
+
+export function gptFeeCalculate(
+  inputCount: number,
+  outputCount: number,
+  feeRate: number
+) {
+  // Constants defining the weight of each component of a transaction
+  const BASE_TX_WEIGHT = 10 * 4; // 10 vbytes * 4 weight units per vbyte
+  const INPUT_WEIGHT = 148 * 4; // 148 vbytes * 4 weight units per vbyte for each input
+  const OUTPUT_WEIGHT = 34 * 4; // 34 vbytes * 4 weight units per vbyte for each output
+
+  // Calculate the weight of the transaction
+  const transactionWeight =
+    BASE_TX_WEIGHT + inputCount * INPUT_WEIGHT + outputCount * OUTPUT_WEIGHT;
+
+  // Calculate the fee by multiplying transaction weight by fee rate (satoshis per weight unit)
+  const fee = Math.ceil((transactionWeight / 4) * feeRate);
+
+  return fee;
 }

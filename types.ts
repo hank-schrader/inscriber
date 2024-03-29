@@ -135,3 +135,13 @@ export interface Inscription {
   inscriptionNumber: number;
   txs: { txHex: string; pushed: boolean }[];
 }
+
+export interface ApiOrdUTXO extends ApiUTXO {
+  content_type: string;
+  content_length: number;
+  inscription_id: string;
+  inscription_number: number;
+  offset: number;
+  owner: string;
+  rawTx?: string;
+}

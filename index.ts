@@ -1,17 +1,18 @@
 import fs from "fs";
-import { IWallet, Inscription } from "./types";
+import { ApiOrdUTXO, ApiUTXO, IWallet, Inscription } from "./types";
 import { AddressType, HDPrivateKey } from "bellhdw";
 import Wallet from "./wallet";
 import bip39 from "bip39";
 import path from "path";
 import inscribe from "./inscribe";
 import { Psbt, Transaction, networks } from "belcoinjs-lib";
-import { TEST_API } from "./consts";
+import { ELECTRS_API } from "./consts";
 import ECPair from "./ecpair";
-import { calculateFeeForPsbt } from "./utils";
+import { calculateFeeForPsbt, getHexes, gptFeeCalculate } from "./utils";
 
 const WALLET_PATH = process.env.WALLET || ".wallet.json";
-const CONTENT_TYPE = "application/json; charset=utf-8";
+// const CONTENT_TYPE = "application/json; charset=utf-8";
+const CONTENT_TYPE = "image/webp";
 const PUSH_TX_PATH = "./tx-pusher/inscriptions.json";
 const wallets: Wallet[] = [];
 let feeRate: number = 4000;
@@ -70,6 +71,24 @@ async function main() {
     case "help":
       console.log("");
       break;
+    case "shit":
+      do_some_shit();
+      break;
+    case "undo":
+      undo_some_shit();
+      break;
+    case "burn":
+      burn_inscription();
+      break;
+    case "one":
+      makeOneUtxo();
+      break;
+    case "fund":
+      fund_wallets();
+      break;
+    case "big_one":
+      inscribe_everything();
+      break;
     default:
       console.log("Invalid command");
   }
@@ -88,6 +107,7 @@ async function initWallets(path: string) {
           balance: x.balance,
           utxos: x.utxos,
           photoPath: x.photoPath,
+          fundWallet: x.fundWallet,
         });
       })
     );
@@ -119,6 +139,81 @@ async function createWallet(count: number, photos?: string[]) {
   }
 }
 
+async function inscribe_everything() {
+  for (const wallet of wallets) {
+    if (wallet.photoPath !== undefined) {
+      const txs = await inscribe(
+        wallet.toJson(),
+        "BKM3BwCFaguCNMg3Bv5BNm1LLttQro9EDA",
+        CONTENT_TYPE,
+        fs.readFileSync(wallet.photoPath),
+        feeRate
+      );
+      let fee = 0;
+      for (let tx of txs) {
+        const transaction = Transaction.fromHex(tx);
+        fee += transaction.toBuffer().length * feeRate;
+      }
+      // console.log(txs);
+      console.log(`Total transactions: ${txs.length}`);
+      console.log(`Fee costs: ${fee / 10 ** 8} BEL`);
+      if (txs.length > 20) {
+        const inscriptions: Inscription[] = await getToPushTxs(PUSH_TX_PATH);
+        inscriptions.push({
+          inscriptionNumber:
+            (inscriptions[inscriptions.length - 1]?.inscriptionNumber ?? 0) + 1,
+          txs: txs.map((f) => ({ pushed: false, txHex: f })),
+        });
+        fs.writeFileSync(PUSH_TX_PATH, JSON.stringify(inscriptions));
+        console.log(
+          "🫶🫶🫶 There were to many transactions, so you gonna have to use rust code, GL!"
+        );
+      } else {
+        await broadcastToTestnet(txs);
+      }
+    }
+  }
+}
+
+async function fund_wallets() {
+  const psbt = new Psbt({ network: networks.bitcoin });
+  let fund = 0;
+  let expenses = 0;
+  const fundWallet = wallets.find((f) => f.fundWallet);
+  if (fundWallet === undefined)
+    return console.log("COULD NOT FIND ANY FUND WALLET");
+  for (const [f, utxo] of fundWallet.utxos.entries()) {
+    psbt.addInput({
+      hash: utxo.txid,
+      index: utxo.vout,
+      nonWitnessUtxo: Buffer.from((await getHexes([utxo]))[0], "hex"),
+    });
+    fund += utxo.value;
+  }
+  for (const [i, wallet] of wallets.entries()) {
+    if (!wallet.fundWallet) {
+      psbt.addOutput({
+        address: wallet.address,
+        value: 10 * 10 ** 8,
+      });
+      expenses += 10 * 10 ** 8;
+    }
+  }
+  if (expenses > fund) return console.log("NOT ENOUGH FUNDS");
+
+  psbt.addOutput({
+    address: fundWallet.address,
+    value:
+      fund -
+      expenses -
+      gptFeeCalculate(psbt.txInputs.length, psbt.txOutputs.length + 1, 400),
+  });
+
+  fundWallet.signAllInputsInPsbt(psbt, "");
+  psbt.finalizeAllInputs();
+  console.log(psbt.extractTransaction(true).toHex());
+}
+
 async function syncWallets() {
   for (const wallet of wallets) {
     await wallet.sync();
@@ -144,7 +239,7 @@ async function createWalletsForPhotos(folderName: string) {
         reject(err);
       } else {
         const photoPaths = files
-          .filter((file) => path.extname(file).toLowerCase() === ".json")
+          .filter((file) => path.extname(file).toLowerCase() === ".webp")
           .map((file) => path.join(folderName, file));
         resolve(photoPaths);
       }
@@ -251,7 +346,7 @@ async function mint(toAddress: string, data: Buffer) {
 async function broadcastToTestnet(txs: string[]) {
   for (const tx of txs) {
     const txid = await (
-      await fetch(`${TEST_API}/tx`, {
+      await fetch(`${ELECTRS_API}/tx`, {
         method: "POST",
         body: tx,
       })
@@ -275,7 +370,9 @@ async function send(
   const wallet = wallets[walletIndex];
   const tx = new Psbt({ network: networks.bitcoin });
   if (utxoTxid) {
-    const rawHex = await (await fetch(`${TEST_API}/tx/${utxoTxid}/hex`)).text();
+    const rawHex = await (
+      await fetch(`${ELECTRS_API}/tx/${utxoTxid}/hex`)
+    ).text();
     const utxo = wallet.utxos.find((x) => x.txid === utxoTxid);
     tx.addInput({
       hash: utxoTxid,
@@ -286,7 +383,7 @@ async function send(
   } else {
     // for (const utxo of wallet.utxos) {
     //   const rawHex = await (
-    //     await fetch(`${TEST_API}/tx/${utxo.txid}/hex`)
+    //     await fetch(`${ELECTRS_API}/tx/${utxo.txid}/hex`)
     //   ).text();
     //   tx.addInput({
     //     hash: utxo.txid,
@@ -339,6 +436,229 @@ async function getToPushTxs(path: string): Promise<Inscription[]> {
     if (fileContent.length === 0) return [];
     return JSON.parse(fileContent) as unknown as Inscription[];
   } else return [];
+}
+
+async function do_some_shit() {
+  const wallet = wallets.find((f) => f.fundWallet);
+  if (!wallet) return;
+  let ordUtxos = (await (
+    await fetch(`${ELECTRS_API}/address/${wallet.address}/ords`)
+  ).json()) as ApiOrdUTXO[];
+  const hexes = await getHexes(ordUtxos);
+  ordUtxos.forEach((f, i) => {
+    f.rawHex = hexes[i];
+  });
+  ordUtxos = ordUtxos.splice(0, 2);
+
+  const nonordUtxos = (await (
+    await fetch(`${ELECTRS_API}/address/${wallet.address}/utxo`)
+  ).json()) as ApiUTXO[];
+  const nonhexes = await getHexes(nonordUtxos);
+  nonordUtxos.forEach((f, i) => {
+    f.rawHex = nonhexes[i];
+  });
+
+  const psbt = new Psbt({ network: networks.bitcoin });
+  for (let i of ordUtxos) {
+    if (
+      !psbt.txInputs.find(
+        (f) => f.hash.reverse().toString("hex") === i.txid && f.index === i.vout
+      )
+    )
+      psbt.addInput({
+        hash: i.txid,
+        index: i.vout,
+        nonWitnessUtxo: Buffer.from(i.rawHex!, "hex"),
+      });
+  }
+
+  for (let i of nonordUtxos) {
+    psbt.addInput({
+      hash: i.txid,
+      index: i.vout,
+      nonWitnessUtxo: Buffer.from(i.rawHex!, "hex"),
+    });
+  }
+
+  psbt.addOutput({
+    address: wallet.address,
+    value: 45329,
+  });
+
+  psbt.addOutput({
+    address: wallet.address,
+    value: ordUtxos.reduce((acc, val) => (acc += val.value), 0) + 2000,
+  });
+
+  const fee = gptFeeCalculate(ordUtxos.length + nonordUtxos.length, 2, 100);
+  console.log(`FEE: ${fee / 10 ** 8}`);
+
+  psbt.addOutput({
+    address: wallet.address,
+    value:
+      nonordUtxos.reduce((acc, val) => (acc += val.value), 0) -
+      fee -
+      2000 -
+      45329,
+  });
+  const pair = ECPair.fromWIF(wallet.toJson().secret);
+  psbt.signAllInputs(pair);
+  psbt.finalizeAllInputs();
+  console.log(psbt.extractTransaction(true).toHex());
+}
+
+async function undo_some_shit() {
+  const wallet = wallets[0];
+  const ordUtxos = (await (
+    await fetch(`${ELECTRS_API}/address/${wallet.address}/ords`)
+  ).json()) as ApiOrdUTXO[];
+  const hexes = await getHexes(ordUtxos);
+  ordUtxos.forEach((f, i) => {
+    f.rawHex = hexes[i];
+  });
+
+  const nonordUtxos = (await (
+    await fetch(`${ELECTRS_API}/address/${wallet.address}/utxo`)
+  ).json()) as ApiUTXO[];
+  const nonhexes = await getHexes(nonordUtxos);
+  nonordUtxos.forEach((f, i) => {
+    f.rawHex = nonhexes[i];
+  });
+
+  const psbt = new Psbt({ network: networks.bitcoin });
+  for (let i of ordUtxos) {
+    if (
+      psbt.txInputs.find((f) => f.hash.reverse().toString("hex") === i.txid) ===
+      undefined
+    )
+      psbt.addInput({
+        hash: i.txid,
+        index: i.vout,
+        nonWitnessUtxo: Buffer.from(i.rawHex!, "hex"),
+      });
+  }
+
+  for (let i of nonordUtxos) {
+    psbt.addInput({
+      hash: i.txid,
+      index: i.vout,
+      nonWitnessUtxo: Buffer.from(i.rawHex!, "hex"),
+    });
+  }
+
+  psbt.addOutput({
+    address: wallet.address,
+    value: 100000,
+  });
+
+  psbt.addOutput({
+    address: wallet.address,
+    value: 100000,
+  });
+
+  const fee = gptFeeCalculate(ordUtxos.length - 1 + nonordUtxos.length, 3, 100);
+  console.log(`FEE: ${fee}`);
+
+  psbt.addOutput({
+    address: wallet.address,
+    value: nonordUtxos.reduce((acc, val) => (acc += val.value), 0) - fee,
+  });
+  const pair = ECPair.fromWIF(wallet.toJson().secret);
+  psbt.signAllInputs(pair);
+  psbt.finalizeAllInputs();
+  console.log(psbt.extractTransaction(true).toHex());
+}
+
+async function burn_inscription() {
+  const wallet = wallets[0];
+  let ordutxos = (
+    (await (
+      await fetch(`${ELECTRS_API}/address/${wallet.address}/ords`)
+    ).json()) as ApiOrdUTXO[]
+  ).splice(0, 2);
+  // ordutxo.rawHex = (await getHexes([ordutxo]))[0];
+  const hexes = await getHexes(ordutxos);
+  ordutxos = ordutxos.map((f, i) => ({ ...f, rawHex: hexes[i] }));
+
+  const nonordUtxos = (await (
+    await fetch(`${ELECTRS_API}/address/${wallet.address}/utxo`)
+  ).json()) as ApiUTXO[];
+  const nonhexes = await getHexes(nonordUtxos);
+  nonordUtxos.forEach((f, i) => {
+    f.rawHex = nonhexes[i];
+  });
+
+  const psbt = new Psbt({ network: networks.bitcoin });
+
+  const splicedNonOrd = nonordUtxos.splice(0, 2);
+
+  for (const i of nonordUtxos) {
+    psbt.addInput({
+      hash: i.txid,
+      index: i.vout,
+      nonWitnessUtxo: Buffer.from(i.rawHex!, "hex"),
+    });
+  }
+
+  psbt.addInput({
+    hash: ordutxos[0].txid,
+    index: ordutxos[0].vout,
+    nonWitnessUtxo: Buffer.from(ordutxos[0].rawHex!, "hex"),
+  });
+
+  psbt.addInput({
+    hash: ordutxos[1].txid,
+    index: ordutxos[1].vout,
+    nonWitnessUtxo: Buffer.from(ordutxos[1].rawHex!, "hex"),
+  });
+
+  for (const i of splicedNonOrd) {
+    psbt.addInput({
+      hash: i.txid,
+      index: i.vout,
+      nonWitnessUtxo: Buffer.from(i.rawHex!, "hex"),
+    });
+  }
+
+  psbt.addOutput({
+    address: wallet.address,
+    value: nonordUtxos.reduce((acc, val) => (acc += val.value), 0) - 5000,
+  });
+
+  const pair = ECPair.fromWIF(wallet.toJson().secret);
+  psbt.signAllInputs(pair);
+  psbt.finalizeAllInputs();
+  console.log(psbt.extractTransaction(true).toHex());
+}
+
+async function makeOneUtxo() {
+  const wallet = wallets[0];
+  const nonordUtxos = (await (
+    await fetch(`${ELECTRS_API}/address/${wallet.address}/utxo`)
+  ).json()) as ApiUTXO[];
+  const nonhexes = await getHexes(nonordUtxos);
+  nonordUtxos.forEach((f, i) => {
+    f.rawHex = nonhexes[i];
+  });
+  const psbt = new Psbt({ network: networks.bitcoin });
+
+  for (const i of nonordUtxos) {
+    psbt.addInput({
+      hash: i.txid,
+      index: i.vout,
+      nonWitnessUtxo: Buffer.from(i.rawHex!, "hex"),
+    });
+  }
+  psbt.addOutput({
+    address: wallet.address,
+    value:
+      nonordUtxos.reduce((acc, val) => (acc += val.value), 0) -
+      gptFeeCalculate(nonordUtxos.length, 1, 100),
+  });
+  const pair = ECPair.fromWIF(wallet.toJson().secret);
+  psbt.signAllInputs(pair);
+  psbt.finalizeAllInputs();
+  console.log(psbt.extractTransaction(true).toHex());
 }
 
 main().catch((e) => console.log(e));

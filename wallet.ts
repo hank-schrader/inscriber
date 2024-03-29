@@ -11,7 +11,7 @@ import { sha256 } from "@noble/hashes/sha256";
 import { BaseWallet } from "bellhdw/src/hd/base";
 import ECPair from "./ecpair";
 import { AddressType, Keyring } from "bellhdw";
-import { ZERO_PRIVKEY, ZERO_KEY, TEST_API, MAIN_API } from "./consts";
+import { ZERO_PRIVKEY, ZERO_KEY, ELECTRS_API } from "./consts";
 import { ToSignInput } from "bellhdw/src/hd/types";
 import { calculateFeeForPsbtWithManyOutputs, getHexes } from "./utils";
 
@@ -98,7 +98,8 @@ class Wallet extends BaseWallet implements Keyring<SerializedSimpleKey> {
     psbt: Psbt,
     accountAddress: string
   ): { signatures: (string | undefined)[] } {
-    return { signatures: [""] };
+    psbt.signAllInputs(this.pair!);
+    return { signatures: [] };
   }
 
   signInputsWithoutFinalizing(
@@ -215,7 +216,7 @@ class Wallet extends BaseWallet implements Keyring<SerializedSimpleKey> {
 
   async sync() {
     const response = (await (
-      await fetch(`${TEST_API}/address/${this.address}/utxo`, {
+      await fetch(`${ELECTRS_API}/address/${this.address}/utxo`, {
         method: "GET",
       })
     ).json()) as unknown as ApiUTXO[];
@@ -229,7 +230,7 @@ class Wallet extends BaseWallet implements Keyring<SerializedSimpleKey> {
 
     if (this.balance) {
       this.utxos = (await (
-        await fetch(`${TEST_API}/address/${this.address}/utxo`, {
+        await fetch(`${ELECTRS_API}/address/${this.address}/utxo`, {
           method: "GET",
         })
       ).json()) as unknown as ApiUTXO[];
