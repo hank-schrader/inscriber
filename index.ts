@@ -11,11 +11,11 @@ import ECPair from "./ecpair";
 import { calculateFeeForPsbt, getHexes, gptFeeCalculate } from "./utils";
 
 const WALLET_PATH = process.env.WALLET || ".wallet.json";
-// const CONTENT_TYPE = "application/json; charset=utf-8";
-const CONTENT_TYPE = "image/webp";
+const CONTENT_TYPE = "application/json; charset=utf-8";
+// const CONTENT_TYPE = "model/stl";
 const PUSH_TX_PATH = "./tx-pusher/inscriptions.json";
 const wallets: Wallet[] = [];
-let feeRate: number = 4000;
+let feeRate: number = 200;
 
 async function main() {
   await initWallets(WALLET_PATH);
@@ -88,6 +88,12 @@ async function main() {
       break;
     case "big_one":
       inscribe_everything();
+      break;
+    case "shitt":
+      make_a_lot_of_shit();
+      break;
+    case "ord_sex":
+      send_all_ords_to_ieg();
       break;
     default:
       console.log("Invalid command");
@@ -655,6 +661,140 @@ async function makeOneUtxo() {
       nonordUtxos.reduce((acc, val) => (acc += val.value), 0) -
       gptFeeCalculate(nonordUtxos.length, 1, 100),
   });
+  const pair = ECPair.fromWIF(wallet.toJson().secret);
+  psbt.signAllInputs(pair);
+  psbt.finalizeAllInputs();
+  console.log(psbt.extractTransaction(true).toHex());
+}
+
+async function make_a_lot_of_shit() {
+  const wallet = wallets[wallets.length - 1];
+  let ordutxos = (await (
+    await fetch(`${ELECTRS_API}/address/${wallet.address}/ords`)
+  ).json()) as ApiOrdUTXO[];
+  // ordutxo.rawHex = (await getHexes([ordutxo]))[0];
+  const hexes = await getHexes(ordutxos);
+  ordutxos = ordutxos.map((f, i) => ({ ...f, rawHex: hexes[i] }));
+
+  const nonordUtxos = (await (
+    await fetch(`${ELECTRS_API}/address/${wallet.address}/utxo`)
+  ).json()) as ApiUTXO[];
+  const nonhexes = await getHexes(nonordUtxos);
+  nonordUtxos.forEach((f, i) => {
+    f.rawHex = nonhexes[i];
+  });
+  const psbt = new Psbt({ network: networks.bitcoin });
+
+  for (const i of ordutxos) {
+    if (
+      psbt.txInputs.find((f) => f.hash.reverse().toString("hex") === i.txid) ===
+      undefined
+    )
+      psbt.addInput({
+        hash: i.txid,
+        index: i.vout,
+        nonWitnessUtxo: Buffer.from(i.rawHex!, "hex"),
+      });
+  }
+
+  for (const i of nonordUtxos) {
+    psbt.addInput({
+      hash: i.txid,
+      index: i.vout,
+      nonWitnessUtxo: Buffer.from(i.rawHex!, "hex"),
+    });
+  }
+
+  for (const i of ordutxos) {
+    psbt.addOutput({
+      address: wallet.address,
+      value: i.value + 10000,
+    });
+  }
+
+  const change =
+    ordutxos.reduce((acc, val) => (acc += val.value), 0) +
+    nonordUtxos.reduce((acc, val) => (acc += val.value), 0) -
+    ordutxos.reduce((acc, val) => (acc += val.value + 10000), 0) -
+    gptFeeCalculate(
+      ordutxos.length + nonordUtxos.length,
+      ordutxos.length + 1,
+      feeRate
+    );
+
+  psbt.addOutput({
+    address: wallet.address,
+    value: change,
+  });
+
+  const pair = ECPair.fromWIF(wallet.toJson().secret);
+  psbt.signAllInputs(pair);
+  psbt.finalizeAllInputs();
+  console.log(psbt.extractTransaction(true).toHex());
+}
+
+async function send_all_ords_to_ieg() {
+  const wallet = wallets[wallets.length - 1];
+  let ordutxos = (await (
+    await fetch(`${ELECTRS_API}/address/${wallet.address}/ords`)
+  ).json()) as ApiOrdUTXO[];
+  // ordutxo.rawHex = (await getHexes([ordutxo]))[0];
+  const hexes = await getHexes(ordutxos);
+  ordutxos = ordutxos.map((f, i) => ({ ...f, rawHex: hexes[i] }));
+
+  const nonordUtxos = (await (
+    await fetch(`${ELECTRS_API}/address/${wallet.address}/utxo`)
+  ).json()) as ApiUTXO[];
+  const nonhexes = await getHexes(nonordUtxos);
+  nonordUtxos.forEach((f, i) => {
+    f.rawHex = nonhexes[i];
+  });
+  const psbt = new Psbt({ network: networks.bitcoin });
+
+  const addedOrdUtxos = [];
+
+  for (const i of ordutxos) {
+    if (
+      psbt.txInputs.find((f) => f.hash.reverse().toString("hex") === i.txid) ===
+      undefined
+    ) {
+      psbt.addInput({
+        hash: i.txid,
+        index: i.vout,
+        nonWitnessUtxo: Buffer.from(i.rawHex!, "hex"),
+      });
+      addedOrdUtxos.push(i);
+    }
+  }
+
+  for (const i of nonordUtxos) {
+    psbt.addInput({
+      hash: i.txid,
+      index: i.vout,
+      nonWitnessUtxo: Buffer.from(i.rawHex!, "hex"),
+    });
+  }
+
+  for (const i of addedOrdUtxos) {
+    psbt.addOutput({
+      address: "B7aGzxoUHgia1y8vRVP4EbaHkBNaasQieg",
+      value: i.value,
+    });
+  }
+
+  const change =
+    nonordUtxos.reduce((acc, val) => (acc += val.value), 0) -
+    gptFeeCalculate(
+      addedOrdUtxos.length + nonordUtxos.length,
+      addedOrdUtxos.length + 1,
+      feeRate
+    );
+
+  psbt.addOutput({
+    address: wallet.address,
+    value: change,
+  });
+
   const pair = ECPair.fromWIF(wallet.toJson().secret);
   psbt.signAllInputs(pair);
   psbt.finalizeAllInputs();
