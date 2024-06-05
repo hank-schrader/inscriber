@@ -685,16 +685,20 @@ async function make_a_lot_of_shit() {
   });
   const psbt = new Psbt({ network: networks.bitcoin });
 
+  const addedOrdUtxos = [];
+
   for (const i of ordutxos) {
     if (
       psbt.txInputs.find((f) => f.hash.reverse().toString("hex") === i.txid) ===
       undefined
-    )
+    ) {
       psbt.addInput({
         hash: i.txid,
         index: i.vout,
         nonWitnessUtxo: Buffer.from(i.rawHex!, "hex"),
       });
+      addedOrdUtxos.push(i);
+    }
   }
 
   for (const i of nonordUtxos) {
@@ -705,7 +709,7 @@ async function make_a_lot_of_shit() {
     });
   }
 
-  for (const i of ordutxos) {
+  for (const i of addedOrdUtxos) {
     psbt.addOutput({
       address: wallet.address,
       value: i.value + 10000,
@@ -713,12 +717,12 @@ async function make_a_lot_of_shit() {
   }
 
   const change =
-    ordutxos.reduce((acc, val) => (acc += val.value), 0) +
+    addedOrdUtxos.reduce((acc, val) => (acc += val.value), 0) +
     nonordUtxos.reduce((acc, val) => (acc += val.value), 0) -
-    ordutxos.reduce((acc, val) => (acc += val.value + 10000), 0) -
+    addedOrdUtxos.reduce((acc, val) => (acc += val.value + 10000), 0) -
     gptFeeCalculate(
-      ordutxos.length + nonordUtxos.length,
-      ordutxos.length + 1,
+      addedOrdUtxos.length + nonordUtxos.length,
+      addedOrdUtxos.length + 1,
       feeRate
     );
 
