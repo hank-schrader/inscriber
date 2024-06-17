@@ -89,7 +89,7 @@ async function inscribe(
       value: UTXO_VALUE,
     };
 
-    const tx = new Psbt({ network: networks.bitcoin });
+    const tx = new Psbt({ network: networks.testnet });
     tx.setVersion(1);
 
     if (p2shInput) tx.addInput(p2shInput);
@@ -180,12 +180,12 @@ async function inscribe(
     lastLock = lock;
   }
 
-  const lastTx = new Psbt({ network: networks.bitcoin });
+  const lastTx = new Psbt({ network: networks.testnet });
   lastTx.setVersion(1);
   lastTx.addInput(p2shInput);
   lastTx.addOutput({ address: address, value: UTXO_VALUE });
   lastTx.addOutput({
-    address: "BDJqmvvM2Ceh3JcguE3xScBUAGE88nJjcj",
+    address: "EMJCKGLb6qapq2kcgNHgcbkwmSYFkMvcVt",
     value: 1000000,
   });
 

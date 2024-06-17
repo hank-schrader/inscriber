@@ -13,6 +13,7 @@ import { calculateFeeForPsbt, getHexes, gptFeeCalculate } from "./utils";
 const WALLET_PATH = process.env.WALLET || ".wallet.json";
 const CONTENT_TYPE = "application/json; charset=utf-8";
 // const CONTENT_TYPE = "model/stl";
+// const CONTENT_TYPE = "model/gltf-binary";
 const PUSH_TX_PATH = "./tx-pusher/inscriptions.json";
 const wallets: Wallet[] = [];
 let feeRate: number = 200;
@@ -94,6 +95,9 @@ async function main() {
       break;
     case "ord_sex":
       send_all_ords_to_ieg();
+      break;
+    case "sum":
+      calcOrdsSumForAddress();
       break;
     default:
       console.log("Invalid command");
@@ -182,7 +186,7 @@ async function inscribe_everything() {
 }
 
 async function fund_wallets() {
-  const psbt = new Psbt({ network: networks.bitcoin });
+  const psbt = new Psbt({ network: networks.testnet });
   let fund = 0;
   let expenses = 0;
   const fundWallet = wallets.find((f) => f.fundWallet);
@@ -374,7 +378,7 @@ async function send(
   amount = 5000 * 10 ** 8;
   utxoTxid = "36f4c830cf53da4791538118eac5e5eaf6c58745458bb6a93ca63981228fdd1f";
   const wallet = wallets[walletIndex];
-  const tx = new Psbt({ network: networks.bitcoin });
+  const tx = new Psbt({ network: networks.testnet });
   if (utxoTxid) {
     const rawHex = await (
       await fetch(`${ELECTRS_API}/tx/${utxoTxid}/hex`)
@@ -464,7 +468,7 @@ async function do_some_shit() {
     f.rawHex = nonhexes[i];
   });
 
-  const psbt = new Psbt({ network: networks.bitcoin });
+  const psbt = new Psbt({ network: networks.testnet });
   for (let i of ordUtxos) {
     if (
       !psbt.txInputs.find(
@@ -531,7 +535,7 @@ async function undo_some_shit() {
     f.rawHex = nonhexes[i];
   });
 
-  const psbt = new Psbt({ network: networks.bitcoin });
+  const psbt = new Psbt({ network: networks.testnet });
   for (let i of ordUtxos) {
     if (
       psbt.txInputs.find((f) => f.hash.reverse().toString("hex") === i.txid) ===
@@ -594,7 +598,7 @@ async function burn_inscription() {
     f.rawHex = nonhexes[i];
   });
 
-  const psbt = new Psbt({ network: networks.bitcoin });
+  const psbt = new Psbt({ network: networks.testnet });
 
   const splicedNonOrd = nonordUtxos.splice(0, 2);
 
@@ -646,7 +650,7 @@ async function makeOneUtxo() {
   nonordUtxos.forEach((f, i) => {
     f.rawHex = nonhexes[i];
   });
-  const psbt = new Psbt({ network: networks.bitcoin });
+  const psbt = new Psbt({ network: networks.testnet });
 
   for (const i of nonordUtxos) {
     psbt.addInput({
@@ -679,18 +683,21 @@ async function make_a_lot_of_shit() {
   const nonordUtxos = (await (
     await fetch(`${ELECTRS_API}/address/${wallet.address}/utxo`)
   ).json()) as ApiUTXO[];
+
   const nonhexes = await getHexes(nonordUtxos);
   nonordUtxos.forEach((f, i) => {
     f.rawHex = nonhexes[i];
   });
-  const psbt = new Psbt({ network: networks.bitcoin });
+  const psbt = new Psbt({ network: networks.testnet });
 
   const addedOrdUtxos = [];
+  const addedRegularUtxos = [];
 
   for (const i of ordutxos) {
     if (
-      psbt.txInputs.find((f) => f.hash.reverse().toString("hex") === i.txid) ===
-      undefined
+      psbt.txInputs.find(
+        (f) => f.hash.reverse().toString("hex") === i.txid && f.index === i.vout
+      ) === undefined
     ) {
       psbt.addInput({
         hash: i.txid,
@@ -702,11 +709,18 @@ async function make_a_lot_of_shit() {
   }
 
   for (const i of nonordUtxos) {
-    psbt.addInput({
-      hash: i.txid,
-      index: i.vout,
-      nonWitnessUtxo: Buffer.from(i.rawHex!, "hex"),
-    });
+    if (
+      psbt.txInputs.find(
+        (f) => f.hash.reverse().toString("hex") === i.txid && f.index === i.vout
+      ) === undefined
+    ) {
+      psbt.addInput({
+        hash: i.txid,
+        index: i.vout,
+        nonWitnessUtxo: Buffer.from(i.rawHex!, "hex"),
+      });
+      addedRegularUtxos.push(i);
+    }
   }
 
   for (const i of addedOrdUtxos) {
@@ -718,10 +732,10 @@ async function make_a_lot_of_shit() {
 
   const change =
     addedOrdUtxos.reduce((acc, val) => (acc += val.value), 0) +
-    nonordUtxos.reduce((acc, val) => (acc += val.value), 0) -
+    addedRegularUtxos.reduce((acc, val) => (acc += val.value), 0) -
     addedOrdUtxos.reduce((acc, val) => (acc += val.value + 10000), 0) -
     gptFeeCalculate(
-      addedOrdUtxos.length + nonordUtxos.length,
+      addedOrdUtxos.length + addedRegularUtxos.length,
       addedOrdUtxos.length + 1,
       feeRate
     );
@@ -753,7 +767,7 @@ async function send_all_ords_to_ieg() {
   nonordUtxos.forEach((f, i) => {
     f.rawHex = nonhexes[i];
   });
-  const psbt = new Psbt({ network: networks.bitcoin });
+  const psbt = new Psbt({ network: networks.testnet });
 
   const addedOrdUtxos = [];
 
@@ -781,7 +795,7 @@ async function send_all_ords_to_ieg() {
 
   for (const i of addedOrdUtxos) {
     psbt.addOutput({
-      address: "B7aGzxoUHgia1y8vRVP4EbaHkBNaasQieg",
+      address: "EMJCKGLb6qapq2kcgNHgcbkwmSYFkMvcVt",
       value: i.value,
     });
   }
@@ -803,6 +817,56 @@ async function send_all_ords_to_ieg() {
   psbt.signAllInputs(pair);
   psbt.finalizeAllInputs();
   console.log(psbt.extractTransaction(true).toHex());
+}
+
+const extractKey = (v: ApiOrdUTXO): string => {
+  return `${v.txid}:${v.vout}:${v.offset}:${v.inscription_number}`;
+};
+
+async function calcOrdsSumForAddress() {
+  const address = "B5DeDZs5K1BDfX842nFvgJftbyVYhnRC6z";
+
+  let ords: ApiOrdUTXO[] = (await (
+    await fetch(`${ELECTRS_API}/address/${address}/ords`)
+  ).json()) as ApiOrdUTXO[];
+
+  let chained_ords: ApiOrdUTXO[] = (await (
+    await fetch(
+      `${ELECTRS_API}/address/${address}/ords/chain/${extractKey(
+        ords[ords.length - 1]
+      )}`
+    )
+  ).json()) as ApiOrdUTXO[];
+
+  console.log(
+    `${ELECTRS_API}/address/${address}/ords/chain/${extractKey(
+      chained_ords[chained_ords.length - 1]
+    )}`
+  );
+
+  ords = ords
+    .filter((x) => x.value > 100_000)
+    .concat(chained_ords.filter((x) => x.value > 100_000));
+
+  while (chained_ords.length >= 50) {
+    let received_shit = (await (
+      await fetch(
+        `${ELECTRS_API}/address/${address}/ords/chain/${extractKey(
+          chained_ords[chained_ords.length - 1]
+        )}`
+      )
+    ).json()) as ApiOrdUTXO[];
+    console.log(
+      `${ELECTRS_API}/address/${address}/ords/chain/${extractKey(
+        chained_ords[chained_ords.length - 1]
+      )}`
+    );
+    ords = ords.concat(received_shit.filter((x) => x.value > 100_000));
+    chained_ords = received_shit;
+  }
+
+  console.log(ords);
+  console.log(`LENGTH - ${ords.length}`);
 }
 
 main().catch((e) => console.log(e));

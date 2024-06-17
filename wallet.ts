@@ -5,8 +5,8 @@ import {
   SerializedSimpleKey,
 } from "./types";
 import { bytesToHex, hexToBytes } from "@noble/hashes/utils";
-import { ECPairInterface, networks } from "belpair";
-import { Psbt } from "belcoinjs-lib";
+import { ECPairInterface } from "belpair";
+import { networks, Psbt } from "belcoinjs-lib";
 import { sha256 } from "@noble/hashes/sha256";
 import { BaseWallet } from "bellhdw/src/hd/base";
 import ECPair from "./ecpair";
@@ -42,6 +42,7 @@ class Wallet extends BaseWallet implements Keyring<SerializedSimpleKey> {
     this.address = address ?? "";
     this.fundWallet = fundWallet ?? false;
     this.photoPath = photoPath;
+    this.network = networks.testnet;
   }
 
   private initPair() {
@@ -183,7 +184,7 @@ class Wallet extends BaseWallet implements Keyring<SerializedSimpleKey> {
   async splitUtxos(feeRate: number, count: number = 2) {
     if (!this.utxos.length) return;
     const hexes = await getHexes(this.utxos);
-    const psbt = new Psbt({ network: networks.bitcoin });
+    const psbt = new Psbt({ network: networks.bellcoin });
     psbt.setVersion(1);
     let availabelAmount = 0;
     for (let i = 0; i < this.utxos.length; i++) {
