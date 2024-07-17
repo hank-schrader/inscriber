@@ -4,16 +4,18 @@ import { AddressType, HDPrivateKey } from "bellhdw";
 import Wallet from "./wallet";
 import bip39 from "bip39";
 import path from "path";
-import inscribe from "./inscribe";
+import inscribe, { MAX_PAYLOAD_LEN } from "./inscribe";
 import { Psbt, Transaction, networks } from "belcoinjs-lib";
-import { ELECTRS_API } from "./consts";
+import { ELECTRS_API, UTXO_VALUE } from "./consts";
 import ECPair from "./ecpair";
 import { calculateFeeForPsbt, getHexes, gptFeeCalculate } from "./utils";
 
 const WALLET_PATH = process.env.WALLET || ".wallet.json";
-const CONTENT_TYPE = "application/json; charset=utf-8";
+// const CONTENT_TYPE = "application/json; charset=utf-8";
 // const CONTENT_TYPE = "model/stl";
 // const CONTENT_TYPE = "model/gltf-binary";
+// const CONTENT_TYPE = "image/svg+xml";
+const CONTENT_TYPE = "image/jpg";
 const PUSH_TX_PATH = "./tx-pusher/inscriptions.json";
 const wallets: Wallet[] = [];
 let feeRate: number = 200;
@@ -55,9 +57,6 @@ async function main() {
       }
       await mint(process.argv[4], fs.readFileSync(process.argv[3]));
       break;
-    case "inscribe":
-      await inscribeWithCompileScript();
-      break;
     case "broadcast":
       await broadcast(process.argv[3]);
       break;
@@ -86,9 +85,6 @@ async function main() {
       break;
     case "fund":
       fund_wallets();
-      break;
-    case "big_one":
-      inscribe_everything();
       break;
     case "shitt":
       make_a_lot_of_shit();
@@ -149,42 +145,6 @@ async function createWallet(count: number, photos?: string[]) {
   }
 }
 
-async function inscribe_everything() {
-  for (const wallet of wallets) {
-    if (wallet.photoPath !== undefined) {
-      const txs = await inscribe(
-        wallet.toJson(),
-        "BKM3BwCFaguCNMg3Bv5BNm1LLttQro9EDA",
-        CONTENT_TYPE,
-        fs.readFileSync(wallet.photoPath),
-        feeRate
-      );
-      let fee = 0;
-      for (let tx of txs) {
-        const transaction = Transaction.fromHex(tx);
-        fee += transaction.toBuffer().length * feeRate;
-      }
-      // console.log(txs);
-      console.log(`Total transactions: ${txs.length}`);
-      console.log(`Fee costs: ${fee / 10 ** 8} BEL`);
-      if (txs.length > 20) {
-        const inscriptions: Inscription[] = await getToPushTxs(PUSH_TX_PATH);
-        inscriptions.push({
-          inscriptionNumber:
-            (inscriptions[inscriptions.length - 1]?.inscriptionNumber ?? 0) + 1,
-          txs: txs.map((f) => ({ pushed: false, txHex: f })),
-        });
-        fs.writeFileSync(PUSH_TX_PATH, JSON.stringify(inscriptions));
-        console.log(
-          "🫶🫶🫶 There were to many transactions, so you gonna have to use rust code, GL!"
-        );
-      } else {
-        await broadcastToTestnet(txs);
-      }
-    }
-  }
-}
-
 async function fund_wallets() {
   const psbt = new Psbt({ network: networks.testnet });
   let fund = 0;
@@ -192,7 +152,7 @@ async function fund_wallets() {
   const fundWallet = wallets.find((f) => f.fundWallet);
   if (fundWallet === undefined)
     return console.log("COULD NOT FIND ANY FUND WALLET");
-  for (const [f, utxo] of fundWallet.utxos.entries()) {
+  for (const [, utxo] of fundWallet.utxos.entries()) {
     psbt.addInput({
       hash: utxo.txid,
       index: utxo.vout,
@@ -200,7 +160,7 @@ async function fund_wallets() {
     });
     fund += utxo.value;
   }
-  for (const [i, wallet] of wallets.entries()) {
+  for (const [, wallet] of wallets.entries()) {
     if (!wallet.fundWallet) {
       psbt.addOutput({
         address: wallet.address,
@@ -278,20 +238,6 @@ async function splitWallets(utxoCount: number) {
   console.log(txs);
 }
 
-async function inscribeWithCompileScript() {
-  const data: Buffer = fs.readFileSync(wallets[0].photoPath!);
-  const toAddress = "BRXknAc5gRVSh6Yo3Gs8hgwRPa3mumBwcm";
-
-  const txs = await inscribe(
-    wallets[0].toJson(),
-    toAddress,
-    CONTENT_TYPE,
-    data,
-    5000
-  );
-  console.log(txs);
-}
-
 async function broadcast(tx: string) {
   const body = {
     jsonrpc: "1.0",
@@ -322,21 +268,40 @@ async function broadcast(tx: string) {
 }
 
 async function mint(toAddress: string, data: Buffer) {
-  const txs = await inscribe(
-    wallets[0].toJson(),
+  const wallet = wallets[wallets.length - 1];
+
+  const feeRate = 200;
+
+  const fakeWeights = new Array(5000).fill(0);
+
+  const fakeTxs = inscribe(
+    wallet.toJson(),
     toAddress,
     CONTENT_TYPE,
     data,
-    feeRate
+    [],
+    fakeWeights
   );
-  let fee = 0;
-  for (let tx of txs) {
-    const transaction = Transaction.fromHex(tx);
-    fee += transaction.toBuffer().length * feeRate;
-  }
-  // console.log(txs);
+
+  const weights = fakeTxs.map((tx) => Transaction.fromHex(tx).virtualSize() * feeRate);
+  const totalFee = weights.reduce((a, b) => a + b, 0);
+  const totalRequiredAmount = totalFee + 1_000_000 + UTXO_VALUE;
+  console.log(`Total required amount: ${totalRequiredAmount}`);
+
+  const req = await fetch(`${ELECTRS_API}/address/${wallet.address}/utxo?hex=true&amount=${totalRequiredAmount}`);
+  const utxos = (await req.json()) as ApiUTXO[];
+
+  const txs = inscribe(
+    wallet.toJson(),
+    toAddress,
+    CONTENT_TYPE,
+    data,
+    utxos,
+    weights
+  );
+
   console.log(`Total transactions: ${txs.length}`);
-  console.log(`Fee costs: ${fee / 10 ** 8} BEL`);
+  console.log(`Fee costs: ${(totalFee) / 10 ** 8} BEL`);
   if (txs.length > 10) {
     const inscriptions: Inscription[] = await getToPushTxs(PUSH_TX_PATH);
     inscriptions.push({
@@ -456,7 +421,7 @@ async function do_some_shit() {
   ).json()) as ApiOrdUTXO[];
   const hexes = await getHexes(ordUtxos);
   ordUtxos.forEach((f, i) => {
-    f.rawHex = hexes[i];
+    f.hex = hexes[i];
   });
   ordUtxos = ordUtxos.splice(0, 2);
 
@@ -465,7 +430,7 @@ async function do_some_shit() {
   ).json()) as ApiUTXO[];
   const nonhexes = await getHexes(nonordUtxos);
   nonordUtxos.forEach((f, i) => {
-    f.rawHex = nonhexes[i];
+    f.hex = nonhexes[i];
   });
 
   const psbt = new Psbt({ network: networks.testnet });
@@ -478,7 +443,7 @@ async function do_some_shit() {
       psbt.addInput({
         hash: i.txid,
         index: i.vout,
-        nonWitnessUtxo: Buffer.from(i.rawHex!, "hex"),
+        nonWitnessUtxo: Buffer.from(i.hex!, "hex"),
       });
   }
 
@@ -486,7 +451,7 @@ async function do_some_shit() {
     psbt.addInput({
       hash: i.txid,
       index: i.vout,
-      nonWitnessUtxo: Buffer.from(i.rawHex!, "hex"),
+      nonWitnessUtxo: Buffer.from(i.hex!, "hex"),
     });
   }
 
@@ -524,7 +489,7 @@ async function undo_some_shit() {
   ).json()) as ApiOrdUTXO[];
   const hexes = await getHexes(ordUtxos);
   ordUtxos.forEach((f, i) => {
-    f.rawHex = hexes[i];
+    f.hex = hexes[i];
   });
 
   const nonordUtxos = (await (
@@ -532,7 +497,7 @@ async function undo_some_shit() {
   ).json()) as ApiUTXO[];
   const nonhexes = await getHexes(nonordUtxos);
   nonordUtxos.forEach((f, i) => {
-    f.rawHex = nonhexes[i];
+    f.hex = nonhexes[i];
   });
 
   const psbt = new Psbt({ network: networks.testnet });
@@ -544,7 +509,7 @@ async function undo_some_shit() {
       psbt.addInput({
         hash: i.txid,
         index: i.vout,
-        nonWitnessUtxo: Buffer.from(i.rawHex!, "hex"),
+        nonWitnessUtxo: Buffer.from(i.hex!, "hex"),
       });
   }
 
@@ -552,7 +517,7 @@ async function undo_some_shit() {
     psbt.addInput({
       hash: i.txid,
       index: i.vout,
-      nonWitnessUtxo: Buffer.from(i.rawHex!, "hex"),
+      nonWitnessUtxo: Buffer.from(i.hex!, "hex"),
     });
   }
 
@@ -595,7 +560,7 @@ async function burn_inscription() {
   ).json()) as ApiUTXO[];
   const nonhexes = await getHexes(nonordUtxos);
   nonordUtxos.forEach((f, i) => {
-    f.rawHex = nonhexes[i];
+    f.hex = nonhexes[i];
   });
 
   const psbt = new Psbt({ network: networks.testnet });
@@ -606,27 +571,27 @@ async function burn_inscription() {
     psbt.addInput({
       hash: i.txid,
       index: i.vout,
-      nonWitnessUtxo: Buffer.from(i.rawHex!, "hex"),
+      nonWitnessUtxo: Buffer.from(i.hex!, "hex"),
     });
   }
 
   psbt.addInput({
     hash: ordutxos[0].txid,
     index: ordutxos[0].vout,
-    nonWitnessUtxo: Buffer.from(ordutxos[0].rawHex!, "hex"),
+    nonWitnessUtxo: Buffer.from(ordutxos[0].hex!, "hex"),
   });
 
   psbt.addInput({
     hash: ordutxos[1].txid,
     index: ordutxos[1].vout,
-    nonWitnessUtxo: Buffer.from(ordutxos[1].rawHex!, "hex"),
+    nonWitnessUtxo: Buffer.from(ordutxos[1].hex!, "hex"),
   });
 
   for (const i of splicedNonOrd) {
     psbt.addInput({
       hash: i.txid,
       index: i.vout,
-      nonWitnessUtxo: Buffer.from(i.rawHex!, "hex"),
+      nonWitnessUtxo: Buffer.from(i.hex!, "hex"),
     });
   }
 
@@ -648,7 +613,7 @@ async function makeOneUtxo() {
   ).json()) as ApiUTXO[];
   const nonhexes = await getHexes(nonordUtxos);
   nonordUtxos.forEach((f, i) => {
-    f.rawHex = nonhexes[i];
+    f.hex = nonhexes[i];
   });
   const psbt = new Psbt({ network: networks.testnet });
 
@@ -656,7 +621,7 @@ async function makeOneUtxo() {
     psbt.addInput({
       hash: i.txid,
       index: i.vout,
-      nonWitnessUtxo: Buffer.from(i.rawHex!, "hex"),
+      nonWitnessUtxo: Buffer.from(i.hex!, "hex"),
     });
   }
   psbt.addOutput({
@@ -686,7 +651,7 @@ async function make_a_lot_of_shit() {
 
   const nonhexes = await getHexes(nonordUtxos);
   nonordUtxos.forEach((f, i) => {
-    f.rawHex = nonhexes[i];
+    f.hex = nonhexes[i];
   });
   const psbt = new Psbt({ network: networks.testnet });
 
@@ -702,7 +667,7 @@ async function make_a_lot_of_shit() {
       psbt.addInput({
         hash: i.txid,
         index: i.vout,
-        nonWitnessUtxo: Buffer.from(i.rawHex!, "hex"),
+        nonWitnessUtxo: Buffer.from(i.hex!, "hex"),
       });
       addedOrdUtxos.push(i);
     }
@@ -717,7 +682,7 @@ async function make_a_lot_of_shit() {
       psbt.addInput({
         hash: i.txid,
         index: i.vout,
-        nonWitnessUtxo: Buffer.from(i.rawHex!, "hex"),
+        nonWitnessUtxo: Buffer.from(i.hex!, "hex"),
       });
       addedRegularUtxos.push(i);
     }
@@ -765,7 +730,7 @@ async function send_all_ords_to_ieg() {
   ).json()) as ApiUTXO[];
   const nonhexes = await getHexes(nonordUtxos);
   nonordUtxos.forEach((f, i) => {
-    f.rawHex = nonhexes[i];
+    f.hex = nonhexes[i];
   });
   const psbt = new Psbt({ network: networks.testnet });
 
@@ -779,7 +744,7 @@ async function send_all_ords_to_ieg() {
       psbt.addInput({
         hash: i.txid,
         index: i.vout,
-        nonWitnessUtxo: Buffer.from(i.rawHex!, "hex"),
+        nonWitnessUtxo: Buffer.from(i.hex!, "hex"),
       });
       addedOrdUtxos.push(i);
     }
@@ -789,7 +754,7 @@ async function send_all_ords_to_ieg() {
     psbt.addInput({
       hash: i.txid,
       index: i.vout,
-      nonWitnessUtxo: Buffer.from(i.rawHex!, "hex"),
+      nonWitnessUtxo: Buffer.from(i.hex!, "hex"),
     });
   }
 
@@ -868,5 +833,6 @@ async function calcOrdsSumForAddress() {
   console.log(ords);
   console.log(`LENGTH - ${ords.length}`);
 }
+
 
 main().catch((e) => console.log(e));

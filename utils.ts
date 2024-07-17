@@ -1,6 +1,7 @@
 import { ELECTRS_API } from "./consts";
+import { MAX_CHUNK_LEN, MAX_PAYLOAD_LEN } from "./inscribe";
 import { ApiUTXO, Chunk, ICalculateFeeForPsbtWithManyOutputs } from "./types";
-import { Psbt, script as belScript, opcodes, Transaction } from "belcoinjs-lib";
+import { Psbt, script as belScript, opcodes, Transaction, crypto as belCrypto } from "belcoinjs-lib";
 
 export async function getHexes(utxos: ApiUTXO[]): Promise<string[]> {
   const hexes = [];
@@ -47,7 +48,7 @@ export function calculateFeeForPsbt(
   });
   psbt.signAllInputs(pair);
   finalizeMethod(psbt);
-  let txSize = psbt.extractTransaction(true).toBuffer().length;
+  let txSize = psbt.extractTransaction(true).virtualSize();
   const fee = Math.ceil(txSize * feeRate);
   return fee;
 }
@@ -91,7 +92,7 @@ export function calculateFeeForLastTx({
     };
   });
   psbt.finalizeInput(1);
-  let txSize = psbt.extractTransaction(true).toBuffer().length;
+  let txSize = psbt.extractTransaction(true).virtualSize();
   const fee = Math.ceil(txSize * feeRate);
   return fee;
 }
@@ -164,8 +165,8 @@ export function numberToChunk(n: number): Chunk {
       n <= 16
         ? undefined
         : n < 128
-        ? Buffer.from([n])
-        : Buffer.from([n % 256, n / 256]),
+          ? Buffer.from([n])
+          : Buffer.from([n % 256, n / 256]),
     len: n <= 16 ? 0 : n < 128 ? 1 : 2,
     opcodenum: n == 0 ? 0 : n <= 16 ? 80 + n : n < 128 ? 1 : 2,
   };
@@ -218,3 +219,4 @@ export function gptFeeCalculate(
 
   return fee;
 }
+

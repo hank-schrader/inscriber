@@ -28,7 +28,7 @@ impl<T, E: std::fmt::Display> ContextWrapper<T, E> for Result<T, E> {
 }
 
 // const TX_ROUTE: &str = "http://0.0.0.0:3001/tx";
-const TX_ROUTE: &str = "http://0.0.0.0:3001/tx";
+const TX_ROUTE: &str = "https://testnet.nintondo.io/electrs/tx";
 
 async fn transaction_is_confirmed(tx_id: &str) -> anyhow::Result<bool> {
     let response = reqwest::get(format!("{}/{}", TX_ROUTE, tx_id))
