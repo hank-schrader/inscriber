@@ -14,15 +14,27 @@ import { UTXO_VALUE } from "./consts";
 export const MAX_CHUNK_LEN = 240;
 export const MAX_PAYLOAD_LEN = 1500;
 
-function inscribeWithWeights(
-  wallet: IWallet,
-  address: string,
-  contentType: string,
-  data: Buffer,
-  utxos: ApiUTXO[],
-  weights: number[],
-  requiredValue: number
-): string[] {
+interface InscribeProps {
+  wallet: IWallet;
+  address: string;
+  contentType: string;
+  data: Buffer;
+  utxos: ApiUTXO[];
+  weights: number[];
+  requiredValue: number;
+  utxoCount?: number;
+}
+
+function inscribeWithWeights({
+  wallet,
+  address,
+  contentType,
+  data,
+  utxos,
+  weights,
+  requiredValue,
+  utxoCount = 1,
+}: InscribeProps): string[] {
   const pair = ECPair.fromWIF(wallet.secret);
 
   if (!utxos.length) {
@@ -30,17 +42,20 @@ function inscribeWithWeights(
     let fakeTx = new Transaction();
     let fakeTxid = new Array(64).fill(0).join("");
     fakeTx.addInput(Buffer.from(fakeTxid, "hex"), 0);
-    fakeTx.addOutput(
-      payments.p2pkh({ pubkey: pair.publicKey, network: networks.testnet })
-        .output!,
-      fakeValue
-    );
-    utxos.push({
-      hex: fakeTx.toHex(),
-      value: fakeValue,
-      txid: fakeTx.getId(),
-      vout: 0,
-    });
+
+    for (let i = 0; i < utxoCount; i++) {
+      fakeTx.addOutput(
+        payments.p2pkh({ pubkey: pair.publicKey, network: networks.testnet })
+          .output!,
+        fakeValue
+      );
+      utxos.push({
+        hex: fakeTx.toHex(),
+        value: fakeValue,
+        txid: fakeTx.getId(),
+        vout: i,
+      });
+    }
   }
 
   let parts = [];

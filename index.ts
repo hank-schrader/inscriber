@@ -279,38 +279,63 @@ async function mint(toAddress: string, data: Buffer) {
 
   const fakeWeights = new Array(5000).fill(0);
 
-  const fakeTxs = inscribe(
-    wallet.toJson(),
-    toAddress,
-    CONTENT_TYPE,
+  let fakeTxs = inscribe({
+    wallet: wallet.toJson(),
+    address: toAddress,
+    contentType: CONTENT_TYPE,
     data,
-    [],
-    fakeWeights,
-    3_000_000
-  );
+    utxos: [],
+    weights: fakeWeights,
+    requiredValue: 3_000_000,
+  });
 
-  const weights = fakeTxs.map(
+  let weights = fakeTxs.map(
     (tx) => Transaction.fromHex(tx).virtualSize() * feeRate
   );
-  const totalFee = weights.reduce((a, b) => a + b, 0);
-  const nintondo_fee = fakeTxs.length * 100_000 + 1_000_000;
-  const totalRequiredAmount = totalFee + nintondo_fee + UTXO_VALUE;
-  console.log(`Total required amount: ${totalRequiredAmount / 10 ** 8} BEL`);
+  let totalFee = weights.reduce((a, b) => a + b, 0);
+  let nintondo_fee = fakeTxs.length * 100_000 + 1_000_000;
+  let requiredValue = totalFee + nintondo_fee + UTXO_VALUE;
 
   const req = await fetch(
-    `${ELECTRS_API}/address/${wallet.address}/utxo?hex=true&amount=${totalRequiredAmount}`
+    `${ELECTRS_API}/address/${wallet.address}/utxo?hex=true&amount=${requiredValue}`
   );
-  const utxos = (await req.json()) as ApiUTXO[];
+  let utxos = (await req.json()) as ApiUTXO[];
 
-  const txs = inscribe(
-    wallet.toJson(),
-    toAddress,
-    CONTENT_TYPE,
+  if (utxos.length > 1) {
+    fakeTxs = inscribe({
+      wallet: wallet.toJson(),
+      address: toAddress,
+      contentType: CONTENT_TYPE,
+      data,
+      utxos: [],
+      weights: fakeWeights,
+      requiredValue,
+      utxoCount: utxos.length,
+    });
+
+    weights = fakeTxs.map(
+      (tx) => Transaction.fromHex(tx).virtualSize() * feeRate
+    );
+    totalFee = weights.reduce((a, b) => a + b, 0);
+    nintondo_fee = fakeTxs.length * 100_000 + 1_000_000;
+    requiredValue = totalFee + nintondo_fee + UTXO_VALUE;
+    if (requiredValue > utxos.reduce((prev, cur) => prev + cur.value, 0)) {
+      const req2 = await fetch(
+        `${ELECTRS_API}/address/${wallet.address}/utxo?hex=true&amount=${requiredValue}`
+      );
+      utxos = (await req2.json()) as ApiUTXO[];
+    }
+  }
+
+  const txs = inscribe({
+    wallet: wallet.toJson(),
+    address: toAddress,
+    contentType: CONTENT_TYPE,
     data,
     utxos,
-    weights,
-    totalRequiredAmount
-  );
+    weights: fakeWeights,
+    requiredValue,
+  });
 
   console.log(`Total transactions: ${txs.length}`);
   console.log(`Fee costs: ${totalFee / 10 ** 8} BEL`);
