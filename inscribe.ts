@@ -1,17 +1,18 @@
 import { ApiUTXO, Chunk, IWallet } from "./types";
-import { Psbt, networks, crypto as belCrypto, opcodes, Transaction, payments } from "belcoinjs-lib";
-import ECPair from "./ecpair";
 import {
-  bufferToChunk,
-  compile,
-  numberToChunk,
-  opcodeToChunk,
-} from "./utils";
+  Psbt,
+  networks,
+  crypto as belCrypto,
+  opcodes,
+  Transaction,
+  payments,
+} from "belcoinjs-lib";
+import ECPair from "./ecpair";
+import { bufferToChunk, compile, numberToChunk, opcodeToChunk } from "./utils";
 import { UTXO_VALUE } from "./consts";
 
 export const MAX_CHUNK_LEN = 240;
 export const MAX_PAYLOAD_LEN = 1500;
-
 
 function inscribeWithWeights(
   wallet: IWallet,
@@ -19,7 +20,8 @@ function inscribeWithWeights(
   contentType: string,
   data: Buffer,
   utxos: ApiUTXO[],
-  weights: number[]
+  weights: number[],
+  requiredValue: number
 ): string[] {
   const pair = ECPair.fromWIF(wallet.secret);
 
@@ -28,8 +30,11 @@ function inscribeWithWeights(
     let fakeTx = new Transaction();
     let fakeTxid = new Array(64).fill(0).join("");
     fakeTx.addInput(Buffer.from(fakeTxid, "hex"), 0);
-    fakeTx.addOutput(payments.p2pkh({ pubkey: pair.publicKey, network: networks.testnet }).output!, fakeValue);
-    
+    fakeTx.addOutput(
+      payments.p2pkh({ pubkey: pair.publicKey, network: networks.testnet })
+        .output!,
+      fakeValue
+    );
     utxos.push({
       hex: fakeTx.toHex(),
       value: fakeValue,
@@ -40,8 +45,9 @@ function inscribeWithWeights(
 
   let parts = [];
   const txs: string[] = [];
+  let nintondoFee = 1_000_000;
 
-  let totalValue = utxos.reduce((p, v) => v.value + p, 0);
+  let totalValue = requiredValue;
 
   while (data.length) {
     let part = data.slice(0, Math.min(MAX_CHUNK_LEN, data.length));
@@ -106,7 +112,11 @@ function inscribeWithWeights(
     const tx = new Psbt({ network: networks.testnet });
     tx.setVersion(1);
 
-    if (p2shInput) { tx.addInput(p2shInput) } else {
+    tx.addOutput(p2shOutput);
+
+    if (p2shInput) {
+      tx.addInput(p2shInput);
+    } else {
       for (let i of utxos) {
         tx.addInput({
           hash: i.txid,
@@ -114,8 +124,13 @@ function inscribeWithWeights(
           nonWitnessUtxo: Buffer.from(i.hex!, "hex"),
         });
       }
-    };
-    tx.addOutput(p2shOutput);
+
+      const change =
+        utxos.reduce((acc, val) => (acc += val.value), 0) - (totalValue + fee);
+      if (change >= 1000) {
+        tx.addOutput({ address, value: change });
+      }
+    }
 
     tx.signAllInputs(pair);
 
@@ -140,6 +155,8 @@ function inscribeWithWeights(
 
     const transaction = tx.extractTransaction(true);
 
+    nintondoFee += 100_000;
+
     p2shInput = {
       hash: transaction.getId(),
       index: 0,
@@ -156,16 +173,17 @@ function inscribeWithWeights(
   lastTx.addOutput({ address: address, value: UTXO_VALUE });
   lastTx.addOutput({
     address: "EMJCKGLb6qapq2kcgNHgcbkwmSYFkMvcVt",
-    value: 1_000_000,
+    value: nintondoFee,
   });
-
 
   const fee = weights.shift()!;
 
-  lastTx.addOutput({
-    address, value: totalValue - fee - UTXO_VALUE - 1_000_000
-  })
-
+  const change = totalValue - fee - UTXO_VALUE - nintondoFee;
+  if (change >= 1000)
+    lastTx.addOutput({
+      address,
+      value: totalValue - fee - UTXO_VALUE - nintondoFee,
+    });
 
   lastTx.signAllInputs(pair);
 

@@ -4,7 +4,7 @@ import { AddressType, HDPrivateKey } from "bellhdw";
 import Wallet from "./wallet";
 import bip39 from "bip39";
 import path from "path";
-import inscribe, { MAX_PAYLOAD_LEN } from "./inscribe";
+import inscribe from "./inscribe";
 import { Psbt, Transaction, networks } from "belcoinjs-lib";
 import { ELECTRS_API, UTXO_VALUE } from "./consts";
 import ECPair from "./ecpair";
@@ -16,6 +16,8 @@ const WALLET_PATH = process.env.WALLET || ".wallet.json";
 // const CONTENT_TYPE = "model/gltf-binary";
 // const CONTENT_TYPE = "image/svg+xml";
 const CONTENT_TYPE = "image/jpg";
+// const CONTENT_TYPE = "image/webp";
+// const CONTENT_TYPE = "text/html";
 const PUSH_TX_PATH = "./tx-pusher/inscriptions.json";
 const wallets: Wallet[] = [];
 let feeRate: number = 200;
@@ -94,6 +96,9 @@ async function main() {
       break;
     case "sum":
       calcOrdsSumForAddress();
+      break;
+    case "kirilliswrong":
+      proofKirillIsWrong();
       break;
     default:
       console.log("Invalid command");
@@ -280,15 +285,21 @@ async function mint(toAddress: string, data: Buffer) {
     CONTENT_TYPE,
     data,
     [],
-    fakeWeights
+    fakeWeights,
+    3_000_000
   );
 
-  const weights = fakeTxs.map((tx) => Transaction.fromHex(tx).virtualSize() * feeRate);
+  const weights = fakeTxs.map(
+    (tx) => Transaction.fromHex(tx).virtualSize() * feeRate
+  );
   const totalFee = weights.reduce((a, b) => a + b, 0);
-  const totalRequiredAmount = totalFee + 1_000_000 + UTXO_VALUE;
-  console.log(`Total required amount: ${totalRequiredAmount}`);
+  const nintondo_fee = fakeTxs.length * 100_000 + 1_000_000;
+  const totalRequiredAmount = totalFee + nintondo_fee + UTXO_VALUE;
+  console.log(`Total required amount: ${totalRequiredAmount / 10 ** 8} BEL`);
 
-  const req = await fetch(`${ELECTRS_API}/address/${wallet.address}/utxo?hex=true&amount=${totalRequiredAmount}`);
+  const req = await fetch(
+    `${ELECTRS_API}/address/${wallet.address}/utxo?hex=true&amount=${totalRequiredAmount}`
+  );
   const utxos = (await req.json()) as ApiUTXO[];
 
   const txs = inscribe(
@@ -297,25 +308,33 @@ async function mint(toAddress: string, data: Buffer) {
     CONTENT_TYPE,
     data,
     utxos,
-    weights
+    weights,
+    totalRequiredAmount
   );
 
   console.log(`Total transactions: ${txs.length}`);
-  console.log(`Fee costs: ${(totalFee) / 10 ** 8} BEL`);
-  if (txs.length > 10) {
-    const inscriptions: Inscription[] = await getToPushTxs(PUSH_TX_PATH);
-    inscriptions.push({
-      inscriptionNumber:
-        (inscriptions[inscriptions.length - 1]?.inscriptionNumber ?? 0) + 1,
-      txs: txs.map((f) => ({ pushed: false, txHex: f })),
-    });
-    fs.writeFileSync(PUSH_TX_PATH, JSON.stringify(inscriptions));
-    console.log(
-      "🫶🫶🫶 There were to many transactions, so you gonna have to use rust code, GL!"
-    );
-  } else {
-    await broadcastToTestnet(txs);
-  }
+  console.log(`Fee costs: ${totalFee / 10 ** 8} BEL`);
+
+  // await broadcastToTestnet(txs);
+
+  const body = {
+    address: wallet.address,
+    data: txs,
+  };
+
+  const url = "https://testnet.nintondo.io/inscriber/push";
+  // const url = "http://localhost:7474/push";
+
+  const response = await fetch(url, {
+    method: "POST",
+    body: JSON.stringify(body),
+    headers: {
+      "Content-type": "application/json",
+    },
+  });
+
+  if (response.ok) console.log("✅ Pushed shit");
+  else console.log(`❌ ${await response.text()}`);
 }
 
 async function broadcastToTestnet(txs: string[]) {
@@ -834,5 +853,13 @@ async function calcOrdsSumForAddress() {
   console.log(`LENGTH - ${ords.length}`);
 }
 
+async function proofKirillIsWrong() {
+  const hex =
+    "010000000107b533f7290ea5edc0d3afd7900352bd639e3d8dd8eb4a8879138a068533c090020000006b483045022100cfc9ed51f9907e05939f56efe32f7cdc118e080cb5ecbe38a5bf09302ba7906002206728628623dcd0d6dd3f82364b027d97126bba03956bffcc9637b2738e5d1d09012102e2eac63c70b030f7ed0d1b87a3e56002dcc986e43c35c404532cf963e9dbd098ffffffff0178652d050000000017a9145f1507bc37642440ed6f8c2cf689e0ce913229d58700000000";
+
+  const psbt = Psbt.fromHex(hex);
+
+  console.log(psbt.txOutputs);
+}
 
 main().catch((e) => console.log(e));
