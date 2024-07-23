@@ -286,20 +286,22 @@ async function mint(toAddress: string, data: Buffer) {
     data,
     utxos: [],
     weights: fakeWeights,
-    requiredValue: 3_000_000,
+    requiredValue: 900_000_000,
   });
 
   let weights = fakeTxs.map(
     (tx) => Transaction.fromHex(tx).virtualSize() * feeRate
   );
   let totalFee = weights.reduce((a, b) => a + b, 0);
-  let nintondo_fee = fakeTxs.length * 100_000 + 1_000_000;
+  const nintondo_fee = fakeTxs.length * 100_000 + 1_000_000;
   let requiredValue = totalFee + nintondo_fee + UTXO_VALUE;
 
   const req = await fetch(
     `${ELECTRS_API}/address/${wallet.address}/utxo?hex=true&amount=${requiredValue}`
   );
   let utxos = (await req.json()) as ApiUTXO[];
+
+  console.log(`Required value after 1st phase: ${requiredValue}`);
 
   if (utxos.length > 1) {
     fakeTxs = inscribe({
@@ -308,7 +310,7 @@ async function mint(toAddress: string, data: Buffer) {
       contentType: CONTENT_TYPE,
       data,
       utxos: [],
-      weights: fakeWeights,
+      weights,
       requiredValue,
       utxoCount: utxos.length,
     });
@@ -317,8 +319,8 @@ async function mint(toAddress: string, data: Buffer) {
       (tx) => Transaction.fromHex(tx).virtualSize() * feeRate
     );
     totalFee = weights.reduce((a, b) => a + b, 0);
-    nintondo_fee = fakeTxs.length * 100_000 + 1_000_000;
     requiredValue = totalFee + nintondo_fee + UTXO_VALUE;
+    console.log(`Required value after second phase: ${requiredValue}`);
     if (requiredValue > utxos.reduce((prev, cur) => prev + cur.value, 0)) {
       const req2 = await fetch(
         `${ELECTRS_API}/address/${wallet.address}/utxo?hex=true&amount=${requiredValue}`
@@ -333,7 +335,7 @@ async function mint(toAddress: string, data: Buffer) {
     contentType: CONTENT_TYPE,
     data,
     utxos,
-    weights: fakeWeights,
+    weights,
     requiredValue,
   });
 
