@@ -11,11 +11,11 @@ import ECPair from "./ecpair";
 import { calculateFeeForPsbt, getHexes, gptFeeCalculate } from "./utils";
 
 const WALLET_PATH = process.env.WALLET || ".wallet.json";
-// const CONTENT_TYPE = "application/json; charset=utf-8";
+const CONTENT_TYPE = "application/json; charset=utf-8";
 // const CONTENT_TYPE = "model/stl";
 // const CONTENT_TYPE = "model/gltf-binary";
 // const CONTENT_TYPE = "image/svg+xml";
-const CONTENT_TYPE = "image/jpg";
+// const CONTENT_TYPE = "image/jpg";
 // const CONTENT_TYPE = "image/webp";
 // const CONTENT_TYPE = "text/html";
 const PUSH_TX_PATH = "./tx-pusher/inscriptions.json";
@@ -272,8 +272,9 @@ async function broadcast(tx: string) {
     .catch((error) => console.error("Error:", error));
 }
 
-async function mint(toAddress: string, data: Buffer) {
+async function mint(toAddress: string, onedata: Buffer) {
   const wallet = wallets[wallets.length - 1];
+  const initialData = new Array(2).fill(onedata) as Buffer[];
 
   const feeRate = 200;
 
@@ -283,7 +284,7 @@ async function mint(toAddress: string, data: Buffer) {
     wallet: wallet.toJson(),
     address: toAddress,
     contentType: CONTENT_TYPE,
-    data,
+    initialData,
     utxos: [],
     weights: fakeWeights,
     requiredValue: 900_000_000,
@@ -301,14 +302,12 @@ async function mint(toAddress: string, data: Buffer) {
   );
   let utxos = (await req.json()) as ApiUTXO[];
 
-  console.log(`Required value after 1st phase: ${requiredValue}`);
-
   if (utxos.length > 1) {
     fakeTxs = inscribe({
       wallet: wallet.toJson(),
       address: toAddress,
       contentType: CONTENT_TYPE,
-      data,
+      initialData,
       utxos: [],
       weights,
       requiredValue,
@@ -320,7 +319,6 @@ async function mint(toAddress: string, data: Buffer) {
     );
     totalFee = weights.reduce((a, b) => a + b, 0);
     requiredValue = totalFee + nintondo_fee + UTXO_VALUE;
-    console.log(`Required value after second phase: ${requiredValue}`);
     if (requiredValue > utxos.reduce((prev, cur) => prev + cur.value, 0)) {
       const req2 = await fetch(
         `${ELECTRS_API}/address/${wallet.address}/utxo?hex=true&amount=${requiredValue}`
@@ -333,7 +331,7 @@ async function mint(toAddress: string, data: Buffer) {
     wallet: wallet.toJson(),
     address: toAddress,
     contentType: CONTENT_TYPE,
-    data,
+    initialData,
     utxos,
     weights,
     requiredValue,
