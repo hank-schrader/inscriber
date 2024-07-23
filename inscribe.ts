@@ -100,6 +100,7 @@ function inscribeWithWeights({
   while (inscriptions.length) {
     let partials: Chunk[][] = [];
     const locks = [];
+    let p2shInputCount = 0;
 
     const tx = new Psbt({ network: networks.testnet });
     tx.setVersion(1);
@@ -108,14 +109,14 @@ function inscribeWithWeights({
     totalValue -= fee;
 
     if (p2shInputs.length) {
-      p2shInputs.forEach(tx.addInput);
+      p2shInputs.forEach((input) => tx.addInput(input));
     }
 
     for (let i = 0; i < inscriptions.length; i++) {
       let inscription = inscriptions[i];
       if (!inscription.length) {
         inscriptions.shift();
-        p2shInputs.shift();
+        i -= 1;
 
         tx.addOutput({ address: address, value: UTXO_VALUE });
 
@@ -124,7 +125,9 @@ function inscribeWithWeights({
             address: "EMJCKGLb6qapq2kcgNHgcbkwmSYFkMvcVt",
             value: nintondoFee,
           });
-          const change = totalValue - fee - UTXO_VALUE - nintondoFee;
+          const change =
+            totalValue - nintondoFee - UTXO_VALUE * initialData.length;
+          console.log(`LAST OUTPUT CHANGE: ${change}`);
           if (change >= 1000)
             tx.addOutput({
               address,
@@ -175,8 +178,12 @@ function inscribeWithWeights({
 
         tx.addOutput({
           script: p2shScript,
-          value: i + 1 === inscriptions.length ? totalValue : UTXO_VALUE,
+          value:
+            i + 1 === inscriptions.length
+              ? totalValue - UTXO_VALUE * (inscriptions.length - 1)
+              : UTXO_VALUE,
         });
+        p2shInputCount += 1;
       }
     }
 
@@ -190,9 +197,7 @@ function inscribeWithWeights({
       }
 
       const change =
-        utxos.reduce((acc, val) => (acc += val.value), 0) -
-        (totalValue + fee) -
-        UTXO_VALUE * inscriptions.length;
+        utxos.reduce((acc, val) => (acc += val.value), 0) - (totalValue + fee);
       if (change >= 1000) {
         tx.addOutput({ address, value: change });
       }
@@ -225,7 +230,8 @@ function inscribeWithWeights({
 
     nintondoFee += 100_000;
 
-    for (let i = 0; i < p2shInputs.length; i++) {
+    p2shInputs = [];
+    for (let i = 0; i < p2shInputCount; i++) {
       p2shInputs.push({
         hash: transaction.getId(),
         index: i,

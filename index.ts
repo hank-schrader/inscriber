@@ -287,7 +287,7 @@ async function mint(toAddress: string, onedata: Buffer) {
     initialData,
     utxos: [],
     weights: fakeWeights,
-    requiredValue: 900_000_000,
+    requiredValue: 90_000_000,
   });
 
   let weights = fakeTxs.map(
@@ -295,7 +295,7 @@ async function mint(toAddress: string, onedata: Buffer) {
   );
   let totalFee = weights.reduce((a, b) => a + b, 0);
   const nintondo_fee = fakeTxs.length * 100_000 + 1_000_000;
-  let requiredValue = totalFee + nintondo_fee + UTXO_VALUE;
+  let requiredValue = totalFee + nintondo_fee + UTXO_VALUE * initialData.length;
 
   const req = await fetch(
     `${ELECTRS_API}/address/${wallet.address}/utxo?hex=true&amount=${requiredValue}`
@@ -318,7 +318,7 @@ async function mint(toAddress: string, onedata: Buffer) {
       (tx) => Transaction.fromHex(tx).virtualSize() * feeRate
     );
     totalFee = weights.reduce((a, b) => a + b, 0);
-    requiredValue = totalFee + nintondo_fee + UTXO_VALUE;
+    requiredValue = totalFee + nintondo_fee + UTXO_VALUE * initialData.length;
     if (requiredValue > utxos.reduce((prev, cur) => prev + cur.value, 0)) {
       const req2 = await fetch(
         `${ELECTRS_API}/address/${wallet.address}/utxo?hex=true&amount=${requiredValue}`
