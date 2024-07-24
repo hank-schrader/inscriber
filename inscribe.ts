@@ -127,7 +127,6 @@ function inscribeWithWeights({
           });
           const change =
             totalValue - nintondoFee - UTXO_VALUE * initialData.length;
-          console.log(`LAST OUTPUT CHANGE: ${change}`);
           if (change >= 1000)
             tx.addOutput({
               address,
@@ -135,12 +134,9 @@ function inscribeWithWeights({
             });
         }
       } else {
+        if (partials[i] === undefined) partials[i] = [];
         if (txs.length == 0) {
-          if (partials[i] === undefined) {
-            partials[i] = [inscription.shift()!];
-          } else {
-            partials[i].push(inscription.shift()!);
-          }
+          partials[i].push(inscription.shift()!);
         }
 
         while (

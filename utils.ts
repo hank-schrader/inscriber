@@ -1,7 +1,13 @@
 import { ELECTRS_API } from "./consts";
 import { MAX_CHUNK_LEN, MAX_PAYLOAD_LEN } from "./inscribe";
 import { ApiUTXO, Chunk, ICalculateFeeForPsbtWithManyOutputs } from "./types";
-import { Psbt, script as belScript, opcodes, Transaction, crypto as belCrypto } from "belcoinjs-lib";
+import {
+  Psbt,
+  script as belScript,
+  opcodes,
+  Transaction,
+  crypto as belCrypto,
+} from "belcoinjs-lib";
 
 export async function getHexes(utxos: ApiUTXO[]): Promise<string[]> {
   const hexes = [];
@@ -98,23 +104,23 @@ export function calculateFeeForLastTx({
 }
 
 export function compile(chunks: Chunk[]) {
-  var buffers: Buffer[] = [];
-  var bufferLength = 0;
+  let buffers: Buffer[] = [];
+  let bufferLength = 0;
 
   function writeUInt8(n: number) {
-    var buf = Buffer.alloc(1);
+    let buf = Buffer.alloc(1);
     buf.writeUInt8(n, 0);
     write(buf);
   }
 
   function writeUInt16LE(n: number) {
-    var buf = Buffer.alloc(2);
+    let buf = Buffer.alloc(2);
     buf.writeUInt16LE(n, 0);
     write(buf);
   }
 
   function writeUInt32LE(n: number) {
-    var buf = Buffer.alloc(4);
+    let buf = Buffer.alloc(4);
     buf.writeUInt32LE(n, 0);
     write(buf);
   }
@@ -128,9 +134,9 @@ export function compile(chunks: Chunk[]) {
     return Buffer.concat(buffers, bufferLength);
   }
 
-  for (var i = 0; i < chunks.length; i++) {
-    var chunk = chunks[i];
-    var opcodenum = chunk.opcodenum;
+  for (let i = 0; i < chunks.length; i++) {
+    let chunk = chunks[i];
+    let opcodenum = chunk.opcodenum;
     writeUInt8(chunk.opcodenum);
     if (chunk.buf) {
       if (opcodenum < opcodes.OP_PUSHDATA1) {
@@ -165,8 +171,8 @@ export function numberToChunk(n: number): Chunk {
       n <= 16
         ? undefined
         : n < 128
-          ? Buffer.from([n])
-          : Buffer.from([n % 256, n / 256]),
+        ? Buffer.from([n])
+        : Buffer.from([n % 256, n / 256]),
     len: n <= 16 ? 0 : n < 128 ? 1 : 2,
     opcodenum: n == 0 ? 0 : n <= 16 ? 80 + n : n < 128 ? 1 : 2,
   };
@@ -219,4 +225,3 @@ export function gptFeeCalculate(
 
   return fee;
 }
-

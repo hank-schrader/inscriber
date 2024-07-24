@@ -11,14 +11,15 @@ import ECPair from "./ecpair";
 import { calculateFeeForPsbt, getHexes, gptFeeCalculate } from "./utils";
 
 const WALLET_PATH = process.env.WALLET || ".wallet.json";
-const CONTENT_TYPE = "application/json; charset=utf-8";
+// const CONTENT_TYPE = "application/json; charset=utf-8";
 // const CONTENT_TYPE = "model/stl";
 // const CONTENT_TYPE = "model/gltf-binary";
 // const CONTENT_TYPE = "image/svg+xml";
 // const CONTENT_TYPE = "image/jpg";
 // const CONTENT_TYPE = "image/webp";
 // const CONTENT_TYPE = "text/html";
-const PUSH_TX_PATH = "./tx-pusher/inscriptions.json";
+// const PUSH_TX_PATH = "./tx-pusher/inscriptions.json";
+const CONTENT_TYPE = "image/gif";
 const wallets: Wallet[] = [];
 let feeRate: number = 200;
 
@@ -274,7 +275,7 @@ async function broadcast(tx: string) {
 
 async function mint(toAddress: string, onedata: Buffer) {
   const wallet = wallets[wallets.length - 1];
-  const initialData = new Array(2).fill(onedata) as Buffer[];
+  const initialData = new Array(5).fill(onedata) as Buffer[];
 
   const feeRate = 200;
 
