@@ -91,8 +91,8 @@ export const mocks: SplitAnswer[] = [
       {
         txid: "",
         vout: 0,
-        value: 1600,
-        inscriptions: [{ offset: 1500 }],
+        value: 2600,
+        inscriptions: [{ offset: 2500 }],
       },
       {
         txid: "",
@@ -101,7 +101,29 @@ export const mocks: SplitAnswer[] = [
         inscriptions: [{ offset: 0 }],
       },
     ],
-    answer: [1600, 1000, 140000 - 2600 - calculateFee(2, 3, 200)],
+    answer: [1600, 1000, 1000, 135000 + 2600 - 3600 - calculateFee(2, 3, 200)],
+  },
+  {
+    toSplit: [
+      {
+        txid: "",
+        vout: 0,
+        value: 200600,
+        inscriptions: [{ offset: 200500 }],
+      },
+      {
+        txid: "",
+        vout: 0,
+        value: 135000,
+        inscriptions: [{ offset: 0 }],
+      },
+    ],
+    answer: [
+      199600,
+      1000,
+      1000,
+      135000 + 200600 - 199600 - 2000 - calculateFee(2, 4, 200),
+    ],
   },
 ];
 
