@@ -8,7 +8,8 @@ import inscribe from "./inscribe";
 import { Psbt, Transaction, networks } from "belcoinjs-lib";
 import { ELECTRS_API, UTXO_VALUE } from "./consts";
 import ECPair from "./ecpair";
-import { calculateFeeForPsbt, getHexes, gptFeeCalculate } from "./utils";
+import { calculateFeeForPsbt, getHexes, calculateFee } from "./utils";
+import { get_mock, mocks, split } from "./mock";
 
 const WALLET_PATH = process.env.WALLET || ".wallet.json";
 // const CONTENT_TYPE = "application/json; charset=utf-8";
@@ -101,6 +102,9 @@ async function main() {
     case "kirilliswrong":
       proofKirillIsWrong();
       break;
+    case "tdd":
+      tdd();
+      break;
     default:
       console.log("Invalid command");
   }
@@ -182,7 +186,7 @@ async function fund_wallets() {
     value:
       fund -
       expenses -
-      gptFeeCalculate(psbt.txInputs.length, psbt.txOutputs.length + 1, 400),
+      calculateFee(psbt.txInputs.length, psbt.txOutputs.length + 1, 400),
   });
 
   fundWallet.signAllInputsInPsbt(psbt, "");
@@ -510,7 +514,7 @@ async function do_some_shit() {
     value: ordUtxos.reduce((acc, val) => (acc += val.value), 0) + 2000,
   });
 
-  const fee = gptFeeCalculate(ordUtxos.length + nonordUtxos.length, 2, 100);
+  const fee = calculateFee(ordUtxos.length + nonordUtxos.length, 2, 100);
   console.log(`FEE: ${fee / 10 ** 8}`);
 
   psbt.addOutput({
@@ -576,7 +580,7 @@ async function undo_some_shit() {
     value: 100000,
   });
 
-  const fee = gptFeeCalculate(ordUtxos.length - 1 + nonordUtxos.length, 3, 100);
+  const fee = calculateFee(ordUtxos.length - 1 + nonordUtxos.length, 3, 100);
   console.log(`FEE: ${fee}`);
 
   psbt.addOutput({
@@ -673,7 +677,7 @@ async function makeOneUtxo() {
     address: wallet.address,
     value:
       nonordUtxos.reduce((acc, val) => (acc += val.value), 0) -
-      gptFeeCalculate(nonordUtxos.length, 1, 100),
+      calculateFee(nonordUtxos.length, 1, 100),
   });
   const pair = ECPair.fromWIF(wallet.toJson().secret);
   psbt.signAllInputs(pair);
@@ -744,7 +748,7 @@ async function make_a_lot_of_shit() {
     addedOrdUtxos.reduce((acc, val) => (acc += val.value), 0) +
     addedRegularUtxos.reduce((acc, val) => (acc += val.value), 0) -
     addedOrdUtxos.reduce((acc, val) => (acc += val.value + 10000), 0) -
-    gptFeeCalculate(
+    calculateFee(
       addedOrdUtxos.length + addedRegularUtxos.length,
       addedOrdUtxos.length + 1,
       feeRate
@@ -812,7 +816,7 @@ async function send_all_ords_to_ieg() {
 
   const change =
     nonordUtxos.reduce((acc, val) => (acc += val.value), 0) -
-    gptFeeCalculate(
+    calculateFee(
       addedOrdUtxos.length + nonordUtxos.length,
       addedOrdUtxos.length + 1,
       feeRate
@@ -886,6 +890,32 @@ async function proofKirillIsWrong() {
   const psbt = Psbt.fromHex(hex);
 
   console.log(psbt.txOutputs);
+}
+
+async function tdd() {
+  for (let i = 0; i < mocks.length; i++) {
+    const mock = get_mock(i);
+
+    const psbt = new Psbt({ network: networks.testnet });
+    split(psbt, mock.toSplit, 200);
+
+    const answer = psbt.txOutputs.map((f) => f.value);
+    let failed = false;
+    for (let i = 0; i < answer.length; i++) {
+      if (answer[i] === mock.answer[i]) {
+        continue;
+      } else {
+        failed = true;
+      }
+    }
+    if (failed) {
+      console.log(`\x1b[31mFailed test #${i + 1}\x1b[0m`);
+      console.log(`\x1b[31mCorrent answer: ${mock.answer}\x1b[0m`);
+      console.log(`\x1b[31mSplitter answer: ${answer}\x1b[0m`);
+    } else {
+      console.log(`\x1b[32mPassed test #${i + 1}\x1b[0m`);
+    }
+  }
 }
 
 main().catch((e) => console.log(e));

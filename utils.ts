@@ -206,7 +206,7 @@ export function calculateTransactionNumber(inscription: Chunk[]): number {
   return txs.length + 1;
 }
 
-export function gptFeeCalculate(
+export function calculateFee(
   inputCount: number,
   outputCount: number,
   feeRate: number

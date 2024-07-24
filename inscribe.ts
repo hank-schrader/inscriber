@@ -115,7 +115,7 @@ function inscribeWithWeights({
     for (let i = 0; i < inscriptions.length; i++) {
       let inscription = inscriptions[i];
       if (!inscription.length) {
-        inscriptions.shift();
+        inscriptions.splice(i, 1);
         i -= 1;
 
         tx.addOutput({ address: address, value: UTXO_VALUE });
