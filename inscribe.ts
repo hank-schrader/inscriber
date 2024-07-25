@@ -230,7 +230,9 @@ function inscribeWithWeights({
     for (let i = 0; i < p2shInputCount; i++) {
       p2shInputs.push({
         hash: transaction.getId(),
-        index: i + (transaction.outs.length - inscriptions.length),
+        index: p2shInputs.length
+          ? i + (transaction.outs.length - inscriptions.length)
+          : i,
         nonWitnessUtxo: transaction.toBuffer(),
         redeemScript: locks[i],
       });
