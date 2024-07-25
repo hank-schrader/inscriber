@@ -17,10 +17,10 @@ const WALLET_PATH = process.env.WALLET || ".wallet.json";
 // const CONTENT_TYPE = "model/gltf-binary";
 // const CONTENT_TYPE = "image/svg+xml";
 // const CONTENT_TYPE = "image/jpg";
-// const CONTENT_TYPE = "image/webp";
+const CONTENT_TYPE = "image/webp";
 // const CONTENT_TYPE = "text/html";
 // const PUSH_TX_PATH = "./tx-pusher/inscriptions.json";
-const CONTENT_TYPE = "image/gif";
+// const CONTENT_TYPE = "image/gif";
 const wallets: Wallet[] = [];
 let feeRate: number = 200;
 

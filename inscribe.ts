@@ -100,7 +100,7 @@ function inscribeWithWeights({
   while (inscriptions.length) {
     let partials: Chunk[][] = [];
     const locks = [];
-    let p2shInputCount = 0;
+    let p2shInputIndexes = [];
 
     const tx = new Psbt({ network: networks.testnet });
     tx.setVersion(1);
@@ -179,7 +179,7 @@ function inscribeWithWeights({
               ? totalValue - UTXO_VALUE * (inscriptions.length - 1)
               : UTXO_VALUE,
         });
-        p2shInputCount += 1;
+        p2shInputIndexes.push(tx.txOutputs.length - 1);
       }
     }
 
@@ -227,12 +227,10 @@ function inscribeWithWeights({
     nintondoFee += 100_000;
 
     p2shInputs = [];
-    for (let i = 0; i < p2shInputCount; i++) {
+    for (let i = 0; i < inscriptions.length; i++) {
       p2shInputs.push({
         hash: transaction.getId(),
-        index: p2shInputs.length
-          ? i + (transaction.outs.length - inscriptions.length)
-          : i,
+        index: p2shInputIndexes[i] ?? i,
         nonWitnessUtxo: transaction.toBuffer(),
         redeemScript: locks[i],
       });
