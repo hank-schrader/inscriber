@@ -203,8 +203,9 @@ function inscribeWithWeights({
     tx.signAllInputs(pair);
 
     if (p2shInputs.length) {
-      tx.txInputs.forEach((_, idx) => {
-        const signature = tx.data.inputs[idx].partialSig![0].signature;
+      console.log(tx.data.inputs.filter((f) => f.partialSig?.length).length);
+      tx.data.inputs.forEach((input, idx) => {
+        const signature = input.partialSig![0].signature;
 
         const unlockScript = compile([
           ...lastPartials[idx],
@@ -228,6 +229,7 @@ function inscribeWithWeights({
     nintondoFee += 100_000;
 
     p2shInputs = [];
+    console.log(p2shInputCount);
     for (let i = 0; i < p2shInputCount; i++) {
       p2shInputs.push({
         hash: transaction.getId(),

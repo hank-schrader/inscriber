@@ -114,6 +114,29 @@ export const mocks: SplitAnswer[] = [
     ],
     answer: [199600, 1000, 1000],
   },
+  {
+    toSplit: [
+      {
+        txid: "",
+        vout: 0,
+        value: 200600,
+        inscriptions: [{ offset: 200500 }, { offset: 200501 }],
+      },
+      {
+        txid: "",
+        vout: 0,
+        value: 135000,
+        inscriptions: [{ offset: 0 }, { offset: 134999 }],
+      },
+      {
+        txid: "",
+        vout: 0,
+        value: 1_000_000,
+        inscriptions: [{ offset: 0 }],
+      },
+    ],
+    answer: [199600, 1000, 1000, 133000, 1000, 1000],
+  },
 ];
 
 export function get_mock(idx: number): SplitAnswer {
@@ -161,7 +184,6 @@ export const split = (
       let lastOffsetWithValue = 0;
       let lastOffset: number | undefined;
 
-
       ord.inscriptions.forEach((inc) => {
         let shit: number | undefined = undefined;
         let offset = inc.offset + changeFromLastUtxo;
@@ -177,7 +199,10 @@ export const split = (
 
         if (offset - lastOffsetWithValue >= 1000) {
           if (serviceFeeLeft > 0) {
-            let toSeriveFee = Math.min(serviceFeeLeft, offset - lastOffsetWithValue);
+            let toSeriveFee = Math.min(
+              serviceFeeLeft,
+              offset - lastOffsetWithValue
+            );
             psbt.addOutput({
               address: MAINNET_SPLITTER_FEE_ADDRESS,
               value: toSeriveFee,
