@@ -119,15 +119,16 @@ export const mocks: SplitAnswer[] = [
       {
         txid: "",
         vout: 0,
-        value: 200600,
-        inscriptions: [{ offset: 200500 }, { offset: 200501 }],
+        value: 135000,
+        inscriptions: [{ offset: 0 }, { offset: 134999 }],
       },
       {
         txid: "",
         vout: 0,
-        value: 135000,
-        inscriptions: [{ offset: 0 }, { offset: 134999 }],
+        value: 200600,
+        inscriptions: [{ offset: 200500 }, { offset: 200501 }],
       },
+
       {
         txid: "",
         vout: 0,
@@ -135,7 +136,7 @@ export const mocks: SplitAnswer[] = [
         inscriptions: [{ offset: 0 }],
       },
     ],
-    answer: [199600, 1000, 1000, 133000, 1000, 1000],
+    answer: [1000, 133000, 1000, 199600, 1000, 1000],
   },
 ];
 
