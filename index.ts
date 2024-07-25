@@ -59,7 +59,35 @@ async function main() {
         console.log("Example: ");
         console.log("bun . mint token.json B7aGzxoUHgia1y8vRVP4EbaHkBNaasQieg");
       }
-      await mint(process.argv[4], fs.readFileSync(process.argv[3]));
+
+      const filePath = process.argv[3];
+      const address = process.argv[4];
+      const fileStat = fs.statSync(filePath);
+
+      let files: Buffer[] = [];
+
+      if (fileStat.isDirectory()) {
+        const fileNames = fs.readdirSync(filePath);
+        for (const fileName of fileNames) {
+          const fullPath = path.join(filePath, fileName);
+          if (fs.statSync(fullPath).isFile()) {
+            const fileBuffer = fs.readFileSync(fullPath);
+            files.push(fileBuffer);
+          }
+        }
+      } else if (fileStat.isFile()) {
+        const fileBuffer = fs.readFileSync(filePath);
+        files.push(fileBuffer);
+      } else {
+        console.error("Invalid file or directory path");
+        return;
+      }
+
+      await mint(address, files);
+
+      // const signleFile = fs.readFileSync(process.argv[3]);
+
+      // await mint(process.argv[4], []);
       break;
     case "broadcast":
       await broadcast(process.argv[3]);
@@ -277,10 +305,8 @@ async function broadcast(tx: string) {
     .catch((error) => console.error("Error:", error));
 }
 
-async function mint(toAddress: string, onedata: Buffer) {
+async function mint(toAddress: string, initialData: Buffer[]) {
   const wallet = wallets[wallets.length - 1];
-  const initialData = new Array(5).fill(onedata) as Buffer[];
-
   const feeRate = 200;
 
   const fakeWeights = new Array(5000).fill(0);
@@ -355,16 +381,16 @@ async function mint(toAddress: string, onedata: Buffer) {
   const url = "https://testnet.nintondo.io/inscriber/push";
   // const url = "http://localhost:7474/push";
 
-  const response = await fetch(url, {
-    method: "POST",
-    body: JSON.stringify(body),
-    headers: {
-      "Content-type": "application/json",
-    },
-  });
+  // const response = await fetch(url, {
+  //   method: "POST",
+  //   body: JSON.stringify(body),
+  //   headers: {
+  //     "Content-type": "application/json",
+  //   },
+  // });
 
-  if (response.ok) console.log("✅ Pushed shit");
-  else console.log(`❌ ${await response.text()}`);
+  // if (response.ok) console.log("✅ Pushed shit");
+  // else console.log(`❌ ${await response.text()}`);
 }
 
 async function broadcastToTestnet(txs: string[]) {

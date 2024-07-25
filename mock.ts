@@ -39,7 +39,7 @@ export const mocks: SplitAnswer[] = [
         inscriptions: [{ offset: 0 }, { offset: 1000 }],
       },
     ],
-    answer: [1000, 1000, 100_000 - 2000 - calculateFee(1, 3, 200)],
+    answer: [1000, 1000],
   },
   {
     toSplit: [
@@ -50,7 +50,7 @@ export const mocks: SplitAnswer[] = [
         inscriptions: [{ offset: 0 }],
       },
     ],
-    answer: [1000, 2000 - 1000 - calculateFee(1, 2, 200)],
+    answer: [1000],
   },
   {
     toSplit: [
@@ -61,7 +61,7 @@ export const mocks: SplitAnswer[] = [
         inscriptions: [{ offset: 500 }],
       },
     ],
-    answer: [1000, 2000 - 1000 - calculateFee(1, 2, 200)],
+    answer: [1000],
   },
   {
     toSplit: [
@@ -78,30 +78,7 @@ export const mocks: SplitAnswer[] = [
         inscriptions: [{ offset: 0 }],
       },
     ],
-    answer: [
-      1500,
-      1000,
-      2500,
-      1000,
-      140000 - 2000 - 4000 - calculateFee(2, 5, 200),
-    ],
-  },
-  {
-    toSplit: [
-      {
-        txid: "",
-        vout: 0,
-        value: 2600,
-        inscriptions: [{ offset: 2500 }],
-      },
-      {
-        txid: "",
-        vout: 0,
-        value: 135000,
-        inscriptions: [{ offset: 0 }],
-      },
-    ],
-    answer: [1600, 1000, 1000, 135000 + 2600 - 3600 - calculateFee(2, 3, 200)],
+    answer: [1500, 1000, 2500, 1000],
   },
   {
     toSplit: [
@@ -118,12 +95,24 @@ export const mocks: SplitAnswer[] = [
         inscriptions: [{ offset: 0 }],
       },
     ],
-    answer: [
-      199600,
-      1000,
-      1000,
-      135000 + 200600 - 199600 - 2000 - calculateFee(2, 4, 200),
+    answer: [199600, 1000, 1000],
+  },
+  {
+    toSplit: [
+      {
+        txid: "",
+        vout: 0,
+        value: 200600,
+        inscriptions: [{ offset: 200500 }, { offset: 200501 }],
+      },
+      {
+        txid: "",
+        vout: 0,
+        value: 135000,
+        inscriptions: [{ offset: 0 }],
+      },
     ],
+    answer: [199600, 1000, 1000],
   },
 ];
 
@@ -133,8 +122,13 @@ export function get_mock(idx: number): SplitAnswer {
   let fakeTxid = new Array(64).fill(0).join("");
   fakeTx.addInput(Buffer.from(fakeTxid, "hex"), 0);
 
+  const change =
+    mock.toSplit.reduce((acc, val) => acc + val.value, 0) -
+    mock.answer.reduce((acc, val) => acc + val, 0) -
+    calculateFee(mock.toSplit.length, mock.answer.length + 1, 200);
+
   return {
-    ...mock,
+    answer: [...mock.answer, change],
     toSplit: mock.toSplit.map((f, i) => ({
       ...f,
       txid: fakeTx.getId(),
@@ -149,7 +143,7 @@ export const split = (
   feeRate: number,
   testnet: boolean = true
 ): SplitResult => {
-  let prevOrdOffset = 0;
+  let changeFromLastUtxo = 0;
   let serviceFeeLeft = testnet ? 0 : SPLITTER_FEE;
 
   ords
@@ -167,7 +161,13 @@ export const split = (
       let lastOffset = 0;
 
       ord.inscriptions.forEach((inc) => {
-        let offset = inc.offset + prevOrdOffset;
+        let shit: number | undefined = undefined;
+        let offset = inc.offset + changeFromLastUtxo;
+        if (ord.value - offset < 1000) {
+          const v = ORD_VALUE - (ord.value - offset);
+          offset -= v;
+          shit = v;
+        }
 
         if (offset - lastOffset >= 1000) {
           if (serviceFeeLeft > 0) {
@@ -185,7 +185,7 @@ export const split = (
                   value: toPay,
                 });
               } else {
-                prevOrdOffset = toPay;
+                changeFromLastUtxo = toPay;
               }
             }
           } else {
@@ -193,7 +193,7 @@ export const split = (
               address,
               value: offset - lastOffset,
             });
-            prevOrdOffset = 0;
+            changeFromLastUtxo = 0;
           }
 
           offset = inc.offset;
@@ -201,14 +201,18 @@ export const split = (
 
         psbt.addOutput({
           address,
-          value: ORD_VALUE + prevOrdOffset,
+          value: ORD_VALUE + changeFromLastUtxo,
         });
 
-        lastOffset = offset + ORD_VALUE;
-        prevOrdOffset = 0;
+        if (shit !== undefined) {
+          changeFromLastUtxo -= shit;
+        }
+
+        lastOffset = offset + ORD_VALUE + changeFromLastUtxo;
+        changeFromLastUtxo = 0;
       });
 
-      prevOrdOffset = ord.value - lastOffset;
+      changeFromLastUtxo = ord.value - lastOffset;
     });
 
   const fee = calculateFee(
@@ -216,17 +220,17 @@ export const split = (
     psbt.txOutputs.length + 1,
     feeRate
   );
-  const isFeePaid = prevOrdOffset - fee >= 0;
+  const isFeePaid = changeFromLastUtxo - fee >= 0;
 
   if (isFeePaid) {
     psbt.addOutput({
       address,
-      value: prevOrdOffset - fee,
+      value: changeFromLastUtxo - fee,
     });
   }
 
   return {
-    change: prevOrdOffset - fee,
+    change: changeFromLastUtxo - fee,
     isFeePaid,
     serviceFeeLeft,
   };

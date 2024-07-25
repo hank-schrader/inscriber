@@ -119,6 +119,7 @@ function inscribeWithWeights({
         i -= 1;
 
         tx.addOutput({ address: address, value: UTXO_VALUE });
+        totalValue -= UTXO_VALUE;
 
         if (!inscriptions.length) {
           tx.addOutput({
