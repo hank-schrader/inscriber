@@ -188,7 +188,7 @@ export const mocks: SplitAnswer[] = [
         inscriptions: [{ offset: 0 }],
       },
     ],
-    answer: [1000, 1000, 132000, 1300, 1200, 1000, 1000, 1000],
+    answer: [1000, 1000, 132000, 1301, 1199, 1000, 1000, 1000],
   },
 ];
 
