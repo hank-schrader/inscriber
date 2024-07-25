@@ -381,16 +381,16 @@ async function mint(toAddress: string, initialData: Buffer[]) {
   const url = "https://testnet.nintondo.io/inscriber/push";
   // const url = "http://localhost:7474/push";
 
-  // const response = await fetch(url, {
-  //   method: "POST",
-  //   body: JSON.stringify(body),
-  //   headers: {
-  //     "Content-type": "application/json",
-  //   },
-  // });
+  const response = await fetch(url, {
+    method: "POST",
+    body: JSON.stringify(body),
+    headers: {
+      "Content-type": "application/json",
+    },
+  });
 
-  // if (response.ok) console.log("✅ Pushed shit");
-  // else console.log(`❌ ${await response.text()}`);
+  if (response.ok) console.log("✅ Pushed shit");
+  else console.log(`❌ ${await response.text()}`);
 }
 
 async function broadcastToTestnet(txs: string[]) {
