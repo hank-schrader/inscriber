@@ -126,8 +126,7 @@ function inscribeWithWeights({
             address: "EMJCKGLb6qapq2kcgNHgcbkwmSYFkMvcVt",
             value: nintondoFee,
           });
-          const change =
-            totalValue - nintondoFee - UTXO_VALUE * initialData.length;
+          const change = totalValue - nintondoFee;
           if (change >= 1000)
             tx.addOutput({
               address,
