@@ -253,6 +253,8 @@ export const split = (
           }
 
           offset = inc.offset;
+        } else {
+          offset -= offset - lastOffsetWithValue;
         }
 
         psbt.addOutput({
