@@ -46,7 +46,7 @@ export const mocks: SplitAnswer[] = [
       {
         txid: "",
         vout: 0,
-        value: 2000,
+        value: 60000,
         inscriptions: [{ offset: 0 }],
       },
     ],
@@ -60,8 +60,14 @@ export const mocks: SplitAnswer[] = [
         value: 2000,
         inscriptions: [{ offset: 500 }],
       },
+      {
+        txid: "",
+        vout: 0,
+        value: 1_000_000,
+        inscriptions: [{ offset: 0 }],
+      },
     ],
-    answer: [1000],
+    answer: [1000, 1000],
   },
   {
     toSplit: [
@@ -213,112 +219,96 @@ export function get_mock(idx: number): SplitAnswer {
   };
 }
 
+interface TestOffset {
+  value: number;
+  offsets: number[];
+}
+
 export const split = (
   psbt: Psbt,
   ords: Split[],
   feeRate: number,
   testnet: boolean = true
-): SplitResult => {
-  let changeFromLastUtxo = 0;
-  let serviceFeeLeft = testnet ? 0 : SPLITTER_FEE;
+) => {
+  const offsets: TestOffset[] = ords.map(i => ({
+    value: i.value, offsets: i.inscriptions.map(i => i.offset)
+  })).sort((a, b) => a.offsets[a.offsets.length - 1] - b.offsets[b.offsets.length - 1]);
 
-  ords
-    .sort((a, b) => {
-      const calc = (v: Split) =>
-        v.value - v.inscriptions[v.inscriptions.length - 1].offset - 1000;
-      return calc(a) - calc(b);
-    })
-    .forEach((ord) => {
-      psbt.addInput({
-        hash: ord.txid,
-        index: ord.vout,
-      });
+  let outputs: number[] = [];
+  let lastOutputType: "utxo" | "ord" | undefined;
 
-      let lastOffsetWithValue = 0;
-      let lastOffset: number | undefined;
+  const checkedOffsets: TestOffset[] = [];
 
-      ord.inscriptions.forEach((inc) => {
-        let shit: number | undefined = undefined;
-        let offset = inc.offset + changeFromLastUtxo;
-        if (ord.value - offset < 1000) {
-          const v = ORD_VALUE - (ord.value - offset);
-          offset -= v;
-          shit = v;
+  offsets.forEach((i) => {
+    let utxoValue = i.value;
+
+    i.offsets.forEach((offset) => {
+      let change = offset - outputs.reduce((acc, val) => acc + val, 0);
+      console.log(`CHANGE: ${change}`)
+
+      if (!lastOutputType && change < 1000) {
+        console.log(`LAST output type: ${lastOutputType}, pushing ord value`)
+        outputs.push(ORD_VALUE);
+        lastOutputType = "ord";
+        if (change > 0) {
+          console.log(`change^^: ${change}`)
+          outputs.push(change);
+          lastOutputType = "utxo";
         }
+        return;
+      }
 
-        if (typeof lastOffset !== "undefined" && offset - lastOffset < 1000) {
-          return;
-        }
+      if (utxoValue - offset < 1000) {
+        change -= ORD_VALUE - (utxoValue - offset);
+        console.log(`change: ${change} after ORD_VAUE - shit`)
+      }
 
-        if (offset - lastOffsetWithValue >= 1000) {
-          if (serviceFeeLeft > 0) {
-            let toSeriveFee = Math.min(
-              serviceFeeLeft,
-              offset - lastOffsetWithValue
-            );
-            psbt.addOutput({
-              address: MAINNET_SPLITTER_FEE_ADDRESS,
-              value: toSeriveFee,
-            });
+      if (lastOutputType === "utxo") {
+        outputs[outputs.length - 1] += change;
+        console.log(`LAST value is utxo ,change`)
+      } else if (change > 0) {
+        outputs.push(change);
+        console.log(`PUSHING change: ${change}`)
+        lastOutputType = "utxo";
+      }
 
-            if (toSeriveFee < offset - lastOffsetWithValue) {
-              const toPay = offset - lastOffsetWithValue - toSeriveFee;
-              if (toPay >= 1000) {
-                psbt.addOutput({
-                  address,
-                  value: toPay,
-                });
-              } else {
-                changeFromLastUtxo = toPay;
-              }
-            }
-          } else {
-            psbt.addOutput({
-              address,
-              value: offset - lastOffsetWithValue,
-            });
-            changeFromLastUtxo = 0;
-          }
-
-          offset = inc.offset;
+      const lastOrdValue = Math.min(ORD_VALUE, utxoValue - offset);
+      console.log(`lastOrdValue: ${lastOrdValue}`)
+      if (lastOrdValue < 1000) {
+        if (outputs[outputs.length - 1] - lastOrdValue >= ORD_VALUE) {
+          outputs[outputs.length - 1] -= ORD_VALUE - lastOrdValue;
+          outputs.push(ORD_VALUE);
+          console.log("reduced last output value and pushed 1000")
         } else {
-          offset -= offset - lastOffsetWithValue;
+          outputs[outputs.length - 1] += lastOrdValue;
+          console.log("added lastord value to the last ouput")
         }
+      } else {
+        outputs.push(ORD_VALUE);
+        console.log("PUSHED LAST SHIT")
+      }
+      lastOutputType = "ord";
+    })
 
-        psbt.addOutput({
-          address,
-          value: ORD_VALUE + changeFromLastUtxo,
-        });
+    checkedOffsets.push(i);
+    outputs.push(checkedOffsets.reduce((acc, val) => acc + val.value, 0) - outputs.reduce((acc, val) => acc + val, 0));
+  });
 
-        if (shit !== undefined) {
-          changeFromLastUtxo -= shit;
-        }
+  console.log(outputs);
 
-        lastOffsetWithValue = offset + ORD_VALUE + changeFromLastUtxo;
-        lastOffset = offset;
-        changeFromLastUtxo = 0;
-      });
-
-      changeFromLastUtxo = ord.value - lastOffsetWithValue;
+  ords.forEach((ord, i) => {
+    psbt.addInput({
+      hash: ord.txid,
+      index: ord.vout,
     });
+  });
 
-  const fee = calculateFee(
-    psbt.txInputs.length,
-    psbt.txOutputs.length + 1,
-    feeRate
-  );
-  const isFeePaid = changeFromLastUtxo - fee >= 0;
+  const fee = calculateFee(ords.length, outputs.length, feeRate);
 
-  if (isFeePaid) {
+  outputs.forEach((output, idx) => {
     psbt.addOutput({
       address,
-      value: changeFromLastUtxo - fee,
-    });
-  }
-
-  return {
-    change: changeFromLastUtxo - fee,
-    isFeePaid,
-    serviceFeeLeft,
-  };
+      value: idx === outputs.length - 1 ? output - fee : output
+    })
+  });
 };
