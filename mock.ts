@@ -158,7 +158,9 @@ export const split = (
         index: ord.vout,
       });
 
-      let lastOffset = 0;
+      let lastOffsetWithValue = 0;
+      let lastOffset: number | undefined;
+
 
       ord.inscriptions.forEach((inc) => {
         let shit: number | undefined = undefined;
@@ -169,16 +171,20 @@ export const split = (
           shit = v;
         }
 
-        if (offset - lastOffset >= 1000) {
+        if (typeof lastOffset !== "undefined" && offset - lastOffset < 1000) {
+          return;
+        }
+
+        if (offset - lastOffsetWithValue >= 1000) {
           if (serviceFeeLeft > 0) {
-            let toSeriveFee = Math.min(serviceFeeLeft, offset - lastOffset);
+            let toSeriveFee = Math.min(serviceFeeLeft, offset - lastOffsetWithValue);
             psbt.addOutput({
               address: MAINNET_SPLITTER_FEE_ADDRESS,
               value: toSeriveFee,
             });
 
-            if (toSeriveFee < offset - lastOffset) {
-              const toPay = offset - lastOffset - toSeriveFee;
+            if (toSeriveFee < offset - lastOffsetWithValue) {
+              const toPay = offset - lastOffsetWithValue - toSeriveFee;
               if (toPay >= 1000) {
                 psbt.addOutput({
                   address,
@@ -191,7 +197,7 @@ export const split = (
           } else {
             psbt.addOutput({
               address,
-              value: offset - lastOffset,
+              value: offset - lastOffsetWithValue,
             });
             changeFromLastUtxo = 0;
           }
@@ -208,11 +214,12 @@ export const split = (
           changeFromLastUtxo -= shit;
         }
 
-        lastOffset = offset + ORD_VALUE + changeFromLastUtxo;
+        lastOffsetWithValue = offset + ORD_VALUE + changeFromLastUtxo;
+        lastOffset = offset;
         changeFromLastUtxo = 0;
       });
 
-      changeFromLastUtxo = ord.value - lastOffset;
+      changeFromLastUtxo = ord.value - lastOffsetWithValue;
     });
 
   const fee = calculateFee(
