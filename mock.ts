@@ -30,28 +30,28 @@ const MAINNET_SPLITTER_FEE_ADDRESS = "EMpxzi7FujHsQHbrZy7wsuiRHFsvxKZSaB";
 const address = "EMpxzi7FujHsQHbrZy7wsuiRHFsvxKZSaB";
 
 export const mocks: SplitAnswer[] = [
-  // {
-  //   toSplit: [
-  //     {
-  //       txid: "",
-  //       vout: 0,
-  //       value: 100_000,
-  //       inscriptions: [{ offset: 0 }, { offset: 1000 }],
-  //     },
-  //   ],
-  //   answer: [1000, 1000],
-  // },
-  // {
-  //   toSplit: [
-  //     {
-  //       txid: "",
-  //       vout: 0,
-  //       value: 60000,
-  //       inscriptions: [{ offset: 0 }],
-  //     },
-  //   ],
-  //   answer: [1000],
-  // },
+  {
+    toSplit: [
+      {
+        txid: "",
+        vout: 0,
+        value: 100_000,
+        inscriptions: [{ offset: 0 }, { offset: 1000 }],
+      },
+    ],
+    answer: [1000, 1000],
+  },
+  {
+    toSplit: [
+      {
+        txid: "",
+        vout: 0,
+        value: 60000,
+        inscriptions: [{ offset: 0 }],
+      },
+    ],
+    answer: [1000],
+  },
   {
     toSplit: [
       {
@@ -69,133 +69,131 @@ export const mocks: SplitAnswer[] = [
     ],
     answer: [1000, 1000, 1000],
   },
-  // {
-  //   toSplit: [
-  //     {
-  //       txid: "",
-  //       vout: 0,
-  //       value: 5000,
-  //       inscriptions: [{ offset: 1500 }],
-  //     },
-  //     {
-  //       txid: "",
-  //       vout: 0,
-  //       value: 135000,
-  //       inscriptions: [{ offset: 0 }],
-  //     },
-  //   ],
-  //   answer: [1500, 1000, 1000],
-  // },
-  // {
-  //   toSplit: [
-  //     {
-  //       txid: "",
-  //       vout: 0,
-  //       value: 200600,
-  //       inscriptions: [{ offset: 200500 }],
-  //     },
-  //     {
-  //       txid: "",
-  //       vout: 0,
-  //       value: 135000,
-  //       inscriptions: [{ offset: 0 }],
-  //     },
-  //   ],
-  //   answer: [199600, 1000, 1000],
-  // },
-  // {
-  //   toSplit: [
-  //     {
-  //       txid: "",
-  //       vout: 0,
-  //       value: 200600,
-  //       inscriptions: [{ offset: 200500 }, { offset: 200501 }],
-  //     },
-  //     {
-  //       txid: "",
-  //       vout: 0,
-  //       value: 135000,
-  //       inscriptions: [{ offset: 0 }],
-  //     },
-  //   ],
-  //   answer: [199600, 1000, 1000],
-  // },
-  // {
-  //   toSplit: [
-  //     {
-  //       txid: "",
-  //       vout: 0,
-  //       value: 135000,
-  //       inscriptions: [{ offset: 0 }, { offset: 134999 }],
-  //     },
-  //     {
-  //       txid: "",
-  //       vout: 0,
-  //       value: 200600,
-  //       inscriptions: [{ offset: 200500 }, { offset: 200501 }],
-  //     },
-
-  //     {
-  //       txid: "",
-  //       vout: 0,
-  //       value: 1_000_000,
-  //       inscriptions: [{ offset: 0 }],
-  //     },
-  //   ],
-  //   answer: [1000, 133000, 1000, 199600, 1000, 1000],
-  // },
-  // {
-  //   toSplit: [
-  //     {
-  //       txid: "",
-  //       vout: 0,
-  //       value: 135000,
-  //       inscriptions: [{ offset: 0 }, { offset: 1001 }, { offset: 134999 }],
-  //     },
-  //     {
-  //       txid: "",
-  //       vout: 0,
-  //       value: 200600,
-  //       inscriptions: [{ offset: 200500 }, { offset: 200501 }],
-  //     },
-
-  //     {
-  //       txid: "",
-  //       vout: 0,
-  //       value: 1_000_000,
-  //       inscriptions: [{ offset: 0 }],
-  //     },
-  //   ],
-  //   answer: [1000, 1000, 132000, 1000, 199600, 1000, 1000],
-  // },
-  // {
-  //   toSplit: [
-  //     {
-  //       txid: "",
-  //       vout: 0,
-  //       value: 135500,
-  //       inscriptions: [
-  //         { offset: 0 },
-  //         { offset: 1001 },
-  //         { offset: 134000 },
-  //         { offset: 135300 },
-  //       ],
-  //     },
-  //     {
-  //       txid: "",
-  //       vout: 0,
-  //       value: 3000,
-  //       inscriptions: [{ offset: 1000 }],
-  //     },
-  //     {
-  //       txid: "",
-  //       vout: 0,
-  //       value: 1_000_000,
-  //       inscriptions: [{ offset: 0 }],
-  //     },
-  //   ],
-  //   answer: [1000, 1000, 132000, 1301, 1199, 1000, 1000, 1000],
-  // },
+  {
+    toSplit: [
+      {
+        txid: "",
+        vout: 0,
+        value: 5000,
+        inscriptions: [{ offset: 1500 }],
+      },
+      {
+        txid: "",
+        vout: 0,
+        value: 135000,
+        inscriptions: [{ offset: 0 }],
+      },
+    ],
+    answer: [1500, 1000, 2500, 1000],
+  },
+  {
+    toSplit: [
+      {
+        txid: "",
+        vout: 0,
+        value: 200600,
+        inscriptions: [{ offset: 200500 }],
+      },
+      {
+        txid: "",
+        vout: 0,
+        value: 135000,
+        inscriptions: [{ offset: 0 }],
+      },
+    ],
+    answer: [199600, 1000, 1000],
+  },
+  {
+    toSplit: [
+      {
+        txid: "",
+        vout: 0,
+        value: 200600,
+        inscriptions: [{ offset: 200500 }, { offset: 200501 }],
+      },
+      {
+        txid: "",
+        vout: 0,
+        value: 135000,
+        inscriptions: [{ offset: 0 }],
+      },
+    ],
+    answer: [199600, 1000, 1000],
+  },
+  {
+    toSplit: [
+      {
+        txid: "",
+        vout: 0,
+        value: 135000,
+        inscriptions: [{ offset: 0 }, { offset: 134999 }],
+      },
+      {
+        txid: "",
+        vout: 0,
+        value: 200600,
+        inscriptions: [{ offset: 200500 }, { offset: 200501 }],
+      },
+      {
+        txid: "",
+        vout: 0,
+        value: 1_000_000,
+        inscriptions: [{ offset: 0 }],
+      },
+    ],
+    answer: [1000, 133000, 1000, 199600, 1000, 1000],
+  },
+  {
+    toSplit: [
+      {
+        txid: "",
+        vout: 0,
+        value: 135000,
+        inscriptions: [{ offset: 0 }, { offset: 1001 }, { offset: 134999 }],
+      },
+      {
+        txid: "",
+        vout: 0,
+        value: 200600,
+        inscriptions: [{ offset: 200500 }, { offset: 200501 }],
+      },
+      {
+        txid: "",
+        vout: 0,
+        value: 1_000_000,
+        inscriptions: [{ offset: 0 }],
+      },
+    ],
+    answer: [1000, 1000, 132000, 1000, 199600, 1000, 1000],
+  },
+  {
+    toSplit: [
+      {
+        txid: "",
+        vout: 0,
+        value: 135500,
+        inscriptions: [
+          { offset: 0 },
+          { offset: 1001 },
+          { offset: 134000 },
+          { offset: 135300 },
+        ],
+      },
+      {
+        txid: "",
+        vout: 0,
+        value: 3000,
+        inscriptions: [{ offset: 1000 }],
+      },
+      {
+        txid: "",
+        vout: 0,
+        value: 1_000_000,
+        inscriptions: [{ offset: 0 }],
+      },
+    ],
+    answer: [1000, 1000, 132000, 1000, 1500, 1000, 1000, 1000],
+  },
 ];
 
 export function get_mock(idx: number): SplitAnswer {
@@ -230,99 +228,100 @@ export const split = (
   feeRate: number,
   testnet: boolean = true
 ) => {
-  const offsets: TestOffset[] = ords.map(i => ({
-    value: i.value, offsets: i.inscriptions.map(i => i.offset)
-  })).sort((a, b) => (a.value - a.offsets[a.offsets.length - 1]) - (a.value - b.offsets[b.offsets.length - 1]));
+  let changeFromLastUtxo = 0;
+  // let serviceFeeLeft = isTestnet(network) ? 0 : SPLITTER_FEE;
+  let serviceFeeLeft = 0;
 
-  let outputs: number[] = [];
-  let lastOutputType: "utxo" | "ord" | undefined;
-
-  for (const i of offsets) {
-    let utxoValue = i.value;
-    let cursor: number = 0;
-
-
-    for (const offset of i.offsets) {
-      console.log("============================================")
-      console.log(`otputs befores hit: ${[...outputs]}`);
-      console.log(`CURRENT OFFSET: ${offset}`)
-      console.log(`CURSOR: ${cursor}`)
-      let change = offset - cursor;
-      console.log(`CHANGE: ${change}`)
-
-      if (!lastOutputType && change < 1000) {
-        console.log(`LAST output type: ${lastOutputType}, pushing ord value`)
-        outputs.push(ORD_VALUE);
-        cursor += ORD_VALUE;
-        lastOutputType = "ord";
-        if (change > 0) {
-          console.log(`change^^: ${change}`)
-          outputs.push(change);
-          cursor += change;
-          lastOutputType = "utxo";
-        }
-        continue;
-      }
-
-      console.log("CONTINUE")
-
-      // if (utxoValue - offset < 1000) {
-      //   change -= ORD_VALUE - (utxoValue - offset);
-      //   console.log(`change: ${change} after ORD_VAUE - shit`)
-      // }
-
-      if (lastOutputType === "utxo") {
-        outputs[outputs.length - 1] += change;
-        cursor += change;
-        console.log(`LAST value is utxo ,change`)
-      } else if (change > 0) {
-        outputs.push(change);
-        cursor += change;
-        console.log(`PUSHING change: ${change}`)
-        lastOutputType = "utxo";
-      }
-
-      const lastOrdValue = Math.min(ORD_VALUE, utxoValue - offset);
-      console.log(`lastOrdValue: ${lastOrdValue}`)
-      if (lastOrdValue < 1000) {
-        if (outputs[outputs.length - 1] - lastOrdValue >= ORD_VALUE) {
-          outputs[outputs.length - 1] -= ORD_VALUE - lastOrdValue;
-          outputs.push(ORD_VALUE);
-          cursor += ORD_VALUE - (ORD_VALUE - lastOrdValue);
-          console.log("reduced last output value and pushed 1000")
-        } else {
-          outputs[outputs.length - 1] += lastOrdValue;
-          cursor += lastOrdValue;
-          console.log("added lastord value to the last ouput")
-        }
-      } else {
-        outputs.push(ORD_VALUE);
-        cursor += ORD_VALUE;
-        console.log("PUSHED LAST SHIT")
-      }
-      lastOutputType = "ord";
-
-      cursor += i.value - offset;
-    }
-  };
-
-  outputs.push(offsets.reduce((acc, val) => acc + val.value, 0) - outputs.reduce((acc, val) => acc + val, 0));
-
-  console.log(outputs);
-
-  ords.forEach((ord, i) => {
+  ords.sort((a, b) => {
+    const calc = (v: Split) => (
+      v.value - v.inscriptions[v.inscriptions.length - 1].offset - ORD_VALUE
+    );
+    return calc(a) - calc(b);
+  }).forEach((ord) => {
     psbt.addInput({
       hash: ord.txid,
       index: ord.vout,
     });
+
+    let lastOffsetWithValue = 0;
+    let lastOffset: number | undefined;
+
+    ord.inscriptions.forEach((inc) => {
+      let offset = inc.offset + changeFromLastUtxo;
+      let shit: number | undefined;
+
+      if (ord.value - offset < ORD_VALUE) {
+        const v = ORD_VALUE - (ord.value - offset);
+        offset -= v;
+        shit = v;
+      }
+
+      if (typeof lastOffset !== "undefined" && offset - lastOffset < 1000) {
+        return;
+      }
+
+      if (offset - lastOffsetWithValue >= ORD_VALUE) {
+        if (serviceFeeLeft > 0) {
+          let toSeriveFee = Math.min(serviceFeeLeft, offset - lastOffsetWithValue);
+          psbt.addOutput({
+            address: MAINNET_SPLITTER_FEE_ADDRESS,
+            value: toSeriveFee
+          });
+
+          if (toSeriveFee > offset - lastOffsetWithValue) {
+            const toPay = offset - lastOffsetWithValue - toSeriveFee;
+            if (toPay >= ORD_VALUE) {
+              psbt.addOutput({
+                address,
+                value: toPay
+              });
+            } else {
+              changeFromLastUtxo = toPay;
+            }
+          }
+        } else {
+          psbt.addOutput({
+            address,
+            value: offset - lastOffsetWithValue
+          });
+          changeFromLastUtxo = 0;
+        }
+
+        offset = inc.offset;
+      } else {
+        offset -= offset - lastOffsetWithValue;
+      }
+
+      psbt.addOutput({
+        address,
+        value: ORD_VALUE + changeFromLastUtxo
+      });
+
+      if (shit !== undefined) {
+        changeFromLastUtxo -= shit;
+      }
+
+      lastOffsetWithValue = offset + ORD_VALUE + changeFromLastUtxo;
+      lastOffset = offset;
+      changeFromLastUtxo = 0;
+    });
+
+    changeFromLastUtxo = ord.value - lastOffsetWithValue;
   });
 
-  const fee = calculateFee(ords.length, outputs.length, feeRate);
+  const fee = calculateFee(psbt.txInputs.length, psbt.txOutputs.length + 1, feeRate);
+  const isFeePaid = changeFromLastUtxo - fee >= 0;
 
-  outputs.forEach((output, idx) => {
+  if (isFeePaid) {
     psbt.addOutput({
       address,
-      value: idx === outputs.length - 1 ? output - fee : output
-    })
-  });
+      value: changeFromLastUtxo - fee
+    });
+  }
+
+  return {
+    change: changeFromLastUtxo - fee,
+    isFeePaid,
+    serviceFeeLeft
+  };
 };
