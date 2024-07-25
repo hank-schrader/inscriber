@@ -203,7 +203,6 @@ function inscribeWithWeights({
     tx.signAllInputs(pair);
 
     if (p2shInputs.length) {
-      console.log(tx.data.inputs.filter((f) => f.partialSig?.length).length);
       tx.data.inputs.forEach((input, idx) => {
         const signature = input.partialSig![0].signature;
 
@@ -229,7 +228,6 @@ function inscribeWithWeights({
     nintondoFee += 100_000;
 
     p2shInputs = [];
-    console.log(p2shInputCount);
     for (let i = 0; i < p2shInputCount; i++) {
       p2shInputs.push({
         hash: transaction.getId(),

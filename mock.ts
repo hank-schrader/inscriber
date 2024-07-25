@@ -138,6 +138,30 @@ export const mocks: SplitAnswer[] = [
     ],
     answer: [1000, 133000, 1000, 199600, 1000, 1000],
   },
+  {
+    toSplit: [
+      {
+        txid: "",
+        vout: 0,
+        value: 135000,
+        inscriptions: [{ offset: 0 }, { offset: 1001 }, { offset: 134999 }],
+      },
+      {
+        txid: "",
+        vout: 0,
+        value: 200600,
+        inscriptions: [{ offset: 200500 }, { offset: 200501 }],
+      },
+
+      {
+        txid: "",
+        vout: 0,
+        value: 1_000_000,
+        inscriptions: [{ offset: 0 }],
+      },
+    ],
+    answer: [1000, 1000, 132000, 1000, 199600, 1000, 1000],
+  },
 ];
 
 export function get_mock(idx: number): SplitAnswer {

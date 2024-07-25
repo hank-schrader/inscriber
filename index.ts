@@ -11,6 +11,8 @@ import ECPair from "./ecpair";
 import { calculateFeeForPsbt, getHexes, calculateFee } from "./utils";
 import { get_mock, mocks, split } from "./mock";
 
+const player = require("play-sound")();
+
 const WALLET_PATH = process.env.WALLET || ".wallet.json";
 // const CONTENT_TYPE = "application/json; charset=utf-8";
 // const CONTENT_TYPE = "model/stl";
