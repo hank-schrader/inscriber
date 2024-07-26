@@ -25,7 +25,7 @@ interface SplitResult {
 }
 
 const ORD_VALUE = 1000;
-const SPLITTER_FEE = 1_000_000;
+const SPLITTER_FEE = 10_000;
 const MAINNET_SPLITTER_FEE_ADDRESS = "EMpxzi7FujHsQHbrZy7wsuiRHFsvxKZSaB";
 const address = "EMpxzi7FujHsQHbrZy7wsuiRHFsvxKZSaB";
 
@@ -358,7 +358,7 @@ export const mocks: SplitAnswer[] = [
         inscriptions: [{ offset: 0 }]
       }
     ],
-    answer: [1000, 1000, 132000, 1500, 1000],
+    answer: [1000, 1000, 132000, 1500, 1000, 1000],
   }
 ];
 
@@ -394,10 +394,9 @@ export const split = (
   testnet: boolean = true
 ) => {
   let changeFromLastUtxo = 0;
-  // let serviceFeeLeft = isTestnet(network) ? 0 : SPLITTER_FEE;
-  let serviceFeeLeft = 0;
+  let serviceFeeLeft = testnet ? 0 : SPLITTER_FEE;
 
-  let outputs: { address: string; value: number }[] = [];
+  let outputs: { address: string; value: number; type: "ord" | "utxo" }[] = [];
 
   ords.sort((a, b) =>
     calc(a) - calc(b)
@@ -415,7 +414,8 @@ export const split = (
       if (offset - lastOffsetWithValue >= ORD_VALUE) {
         outputs.push({
           address,
-          value: offset - lastOffsetWithValue
+          value: offset - lastOffsetWithValue,
+          type: "utxo"
         });
         changeFromLastUtxo = 0;
 
@@ -434,17 +434,18 @@ export const split = (
           outputs[outputs.length - 1].value -= v;
         } else {
           outputs[outputs.length - 1].value += utxo.value - offset;
+          outputs[outputs.length - 1].type = "ord";
           lastOffsetWithValue = utxo.value;
-          changeFromLastUtxo -= utxo.value - offset;
           return;
         }
       }
 
-      if (changeFromLastUtxo < 0) return changeFromLastUtxo = 0;
+      if (changeFromLastUtxo < 0) return;
 
       outputs.push({
         address,
-        value: ORD_VALUE + changeFromLastUtxo
+        value: ORD_VALUE + changeFromLastUtxo,
+        type: "ord"
       });
 
       lastOffsetWithValue = offset + ORD_VALUE;
@@ -461,9 +462,42 @@ export const split = (
   if (isFeePaid) {
     outputs.push({
       address,
-      value: change - fee
+      value: change - fee,
+      type: "utxo"
     });
   }
+
+  outputs = outputs.map((out) => {
+    if (serviceFeeLeft > 0 && out.type === "utxo") {
+      if (out.value < serviceFeeLeft) {
+        serviceFeeLeft -= out.value;
+
+        return [
+          {
+            ...out,
+            address: MAINNET_SPLITTER_FEE_ADDRESS
+          }
+        ];
+      } else {
+        const toServiceFee = out.value - serviceFeeLeft < 1000 ? serviceFeeLeft - (out.value - serviceFeeLeft) : serviceFeeLeft;
+        serviceFeeLeft -= toServiceFee;
+
+        return [
+          {
+            address: MAINNET_SPLITTER_FEE_ADDRESS,
+            value: toServiceFee,
+            type: "utxo" as "utxo"
+          },
+          {
+            address: out.address,
+            value: out.value - toServiceFee,
+            type: "utxo" as "utxo"
+          }
+        ]
+      }
+    }
+    return out;
+  }).flat();
 
   outputs.forEach(out => psbt.addOutput(out));
 
