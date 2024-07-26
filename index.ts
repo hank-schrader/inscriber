@@ -934,6 +934,9 @@ async function tdd() {
         failed = true;
       }
     }
+    if (mock.answer.length !== answer.length) {
+      failed = true;
+    }
     if (failed) {
       console.log(`\x1b[31mFailed test #${i + 1}\x1b[0m`);
       console.log(`\x1b[31mCorrent answer: ${mock.answer}\x1b[0m`);

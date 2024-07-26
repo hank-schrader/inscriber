@@ -192,7 +192,7 @@ export const mocks: SplitAnswer[] = [
         inscriptions: [{ offset: 0 }],
       },
     ],
-    answer: [1000, 1000, 132000, 1000, 1500, 1000, 1000, 1000],
+    answer: [1000, 1000, 132000, 1500, 1000, 1000, 1000, 1000],
   },
   {
     toSplit: [
@@ -350,9 +350,15 @@ export const mocks: SplitAnswer[] = [
         vout: 0,
         value: 1000,
         inscriptions: [{ offset: 300 }]
+      },
+      {
+        txid: "",
+        vout: 0,
+        value: 1_000_000,
+        inscriptions: [{ offset: 0 }]
       }
     ],
-    answer: [1000, 1000, 132000, 1000, 1500],
+    answer: [1000, 1000, 132000, 1500, 1000],
   }
 ];
 
@@ -377,10 +383,9 @@ export function get_mock(idx: number): SplitAnswer {
   };
 }
 
-interface TestOffset {
-  value: number;
-  offsets: number[];
-}
+const calc = (v: Split) => (
+  v.value - v.inscriptions[v.inscriptions.length - 1].offset - ORD_VALUE
+);
 
 export const split = (
   psbt: Psbt,
@@ -394,105 +399,76 @@ export const split = (
 
   let outputs: { address: string; value: number }[] = [];
 
-  ords.sort((a, b) => {
-    const calc = (v: Split) => (
-      v.value - v.inscriptions[v.inscriptions.length - 1].offset - ORD_VALUE
-    );
-    return calc(a) - calc(b);
-  }).forEach((ord, txIdx) => {
+  ords.sort((a, b) =>
+    calc(a) - calc(b)
+  ).forEach((utxo) => {
     psbt.addInput({
-      hash: ord.txid,
-      index: ord.vout,
+      hash: utxo.txid,
+      index: utxo.vout,
     });
 
     let lastOffsetWithValue = 0;
-    let lastOffset: number | undefined;
 
-    ord.inscriptions.forEach((inc, idx) => {
+    utxo.inscriptions.forEach((inc) => {
       let offset = inc.offset + changeFromLastUtxo;
-      let diff: number | undefined;
-
-      if (ord.value - offset < ORD_VALUE) {
-        const v = ORD_VALUE - (ord.value - offset);
-        offset -= v;
-        diff = v;
-      }
-
-      if (typeof lastOffset !== "undefined" && offset - lastOffset < 1000) {
-        if (idx === ord.inscriptions.length - 1 && txIdx === ords.length - 1) {
-          outputs[outputs.length - 1].value += offset - lastOffset;
-        }
-        return;
-      }
 
       if (offset - lastOffsetWithValue >= ORD_VALUE) {
-        if (serviceFeeLeft > 0) {
-          let toServiceFee = Math.min(serviceFeeLeft, offset - lastOffsetWithValue);
-          outputs.push({
-            address: MAINNET_SPLITTER_FEE_ADDRESS,
-            value: toServiceFee
-          });
-          serviceFeeLeft -= toServiceFee;
-
-          if (toServiceFee < offset - lastOffsetWithValue) {
-            const toPay = offset - lastOffsetWithValue - toServiceFee;
-            if (toPay >= ORD_VALUE) {
-              outputs.push({
-                address,
-                value: toPay
-              });
-            } else {
-              changeFromLastUtxo += toPay;
-            }
-          }
-        } else {
-          outputs.push({
-            address,
-            value: offset - lastOffsetWithValue
-          });
-          changeFromLastUtxo = 0;
-        }
+        outputs.push({
+          address,
+          value: offset - lastOffsetWithValue
+        });
+        changeFromLastUtxo = 0;
 
         offset = inc.offset;
       } else {
         offset -= offset - lastOffsetWithValue;
       }
 
+      if (utxo.value - offset < ORD_VALUE) {
+        const v = ORD_VALUE - (utxo.value - offset);
+
+        changeFromLastUtxo = 0;
+
+        if (outputs[outputs.length - 1].value - v >= ORD_VALUE) {
+          offset -= v;
+          outputs[outputs.length - 1].value -= v;
+        } else {
+          outputs[outputs.length - 1].value += utxo.value - offset;
+          lastOffsetWithValue = utxo.value;
+          changeFromLastUtxo -= utxo.value - offset;
+          return;
+        }
+      }
+
+      if (changeFromLastUtxo < 0) return changeFromLastUtxo = 0;
+
       outputs.push({
         address,
         value: ORD_VALUE + changeFromLastUtxo
       });
 
-      if (diff !== undefined) {
-        changeFromLastUtxo -= diff;
-      }
-
-      lastOffsetWithValue = offset + ORD_VALUE + changeFromLastUtxo;
-      lastOffset = offset;
+      lastOffsetWithValue = offset + ORD_VALUE;
       changeFromLastUtxo = 0;
     });
 
-    changeFromLastUtxo = ord.value - lastOffsetWithValue;
+    changeFromLastUtxo = utxo.value - lastOffsetWithValue;
   });
 
   const fee = calculateFee(psbt.txInputs.length, outputs.length + 1, feeRate);
-  const isFeePaid = changeFromLastUtxo - fee >= 0;
+  const change = ords.reduce((prev, cur) => prev + cur.value, 0) - outputs.reduce((prev, cur) => prev + cur.value, 0);
+  const isFeePaid = change - fee >= 0;
 
   if (isFeePaid) {
     outputs.push({
       address,
-      value: changeFromLastUtxo - fee
+      value: change - fee
     });
   }
 
   outputs.forEach(out => psbt.addOutput(out));
 
-  console.log(changeFromLastUtxo - fee);
-  console.log(ords.reduce((acc, val) => acc + val.value, 0) - psbt.txOutputs.reduce((acc, val) => acc + val.value, 0));
-  console.log(fee);
-
   return {
-    change: changeFromLastUtxo - fee,
+    change: change - fee,
     isFeePaid,
     serviceFeeLeft
   };
