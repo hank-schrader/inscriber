@@ -17,7 +17,7 @@ const WALLET_PATH = process.env.WALLET || ".wallet.json";
 // const CONTENT_TYPE = "model/gltf-binary";
 // const CONTENT_TYPE = "image/svg+xml";
 // const CONTENT_TYPE = "image/jpg";
-const CONTENT_TYPE = "image/webp";
+const CONTENT_TYPE = "image/png";
 // const CONTENT_TYPE = "text/html";
 // const PUSH_TX_PATH = "./tx-pusher/inscriptions.json";
 // const CONTENT_TYPE = "image/gif";
@@ -309,7 +309,7 @@ async function mint(toAddress: string, initialData: Buffer[]) {
   const wallet = wallets[wallets.length - 1];
   const feeRate = 200;
 
-  const fakeWeights = new Array(5000).fill(0);
+  const fakeWeights = new Array(50000).fill(0);
 
   let fakeTxs = inscribe({
     wallet: wallet.toJson(),
@@ -318,7 +318,7 @@ async function mint(toAddress: string, initialData: Buffer[]) {
     initialData,
     utxos: [],
     weights: fakeWeights,
-    requiredValue: 90_000_000,
+    requiredValue: 150_000_000,
   });
 
   let weights = fakeTxs.map(
@@ -333,7 +333,7 @@ async function mint(toAddress: string, initialData: Buffer[]) {
   );
   let utxos = (await req.json()) as ApiUTXO[];
 
-  if (utxos.length > 1) {
+  if (Array.isArray(utxos) && utxos.length > 1) {
     fakeTxs = inscribe({
       wallet: wallet.toJson(),
       address: toAddress,

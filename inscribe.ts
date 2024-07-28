@@ -42,7 +42,7 @@ function inscribeWithWeights({
   const datas = initialData.sort((a, b) => a.length - b.length);
 
   if (!utxos.length) {
-    const fakeValue = 99999999999999;
+    const fakeValue = 999_999_999_999;
     let fakeTx = new Transaction();
     let fakeTxid = new Array(64).fill(0).join("");
     fakeTx.addInput(Buffer.from(fakeTxid, "hex"), 0);
